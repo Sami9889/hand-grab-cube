@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hand Grab Cube — Sami9889</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="ui">
+    <h1>Hand Grab Cube</h1>
+    <p>Pinch (thumb + index) to grab, move, and throw cubes. Double-pinch or press N to spawn more. Press G to toggle gravity, R to reset.</p>
+    <div id="status">Status: initializing…</div>
+    <div class="controls">N: spawn • G: toggle gravity • R: reset</div>
+  </div>
+
+  <video id="video" autoplay playsinline style="display:none"></video>
+  <canvas id="handCanvas" style="position:absolute; left:0; top:0; z-index: 9; pointer-events: none;"></canvas>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
