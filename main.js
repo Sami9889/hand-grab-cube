@@ -15,8 +15,31 @@ import { fuseAverages } from './src/multiview.js';
       let world = { addBody: ()=>{}, step: ()=>{} }; // stub, replace with real physics world if needed
       const ragdollBtn = document.getElementById('ragdollToggle');
       if (ragdollBtn) {
-        ragdollBtn.addEventListener('click', ()=>{
+        ragdollBtn.addEventListener('click', async ()=>{
           if (!ragdoll) ragdoll = createAdvancedRagdoll(avatar, world);
+          if (avatar.isRagdoll) {
+            // Blending out of ragdoll: move all bodies to tracked pose, zero velocities
+            if (latestPose && latestPose.world && ragdoll) {
+              for (const name in ragdoll.bodies) {
+                const idx = avatar.joints[name] && avatar.joints[name].mesh ? null : null;
+                // Try to use world pose index if available
+                let tracked = null;
+                if (avatar.joints[name] && avatar.joints[name].mesh) {
+                  tracked = avatar.joints[name].mesh.position;
+                } else if (typeof idx === 'number' && latestPose.world[idx]) {
+                  tracked = latestPose.world[idx];
+                }
+                if (tracked) {
+                  ragdoll.bodies[name].position.x = tracked.x;
+                  ragdoll.bodies[name].position.y = tracked.y;
+                  ragdoll.bodies[name].position.z = tracked.z;
+                  ragdoll.bodies[name].velocity.x = 0;
+                  ragdoll.bodies[name].velocity.y = 0;
+                  ragdoll.bodies[name].velocity.z = 0;
+                }
+              }
+            }
+          }
           avatar.isRagdoll = !avatar.isRagdoll;
           setAdvancedRagdollMode(avatar, ragdoll, avatar.isRagdoll);
           ragdollBtn.textContent = avatar.isRagdoll ? 'Disable Ragdoll' : 'Enable Ragdoll';
