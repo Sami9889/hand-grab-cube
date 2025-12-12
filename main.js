@@ -1,5 +1,6 @@
 import { createRenderer, startLoop } from './src/renderer.js';
 import { clampVelocity, clampPosition, syncKinematic } from './src/physics-stabilizer.js';
+import { getSupportLeg, getSupportFootPosition } from './src/physics-support-leg.js';
 import { createTracking } from './src/tracking.js';
 import { createAvatar, updateAvatarFromPose } from './src/avatar.js';
 import { createVRControls } from './src/vr.js';
@@ -295,20 +296,35 @@ import { fuseAverages } from './src/multiview.js';
   startLoop(renderer, scene, camera, (dt)=>{
     if (latestPose) {
       let trackedPos = null;
+      let smoothing = 0.7;
       if (latestPose.world && latestPose.world.length) {
-        // Use pelvis or hip as root for physics sync
-        const pelvis = latestPose.world[23] || latestPose.world[24] || latestPose.world[0];
-        if (pelvis) trackedPos = { x: pelvis.x, y: pelvis.y + 1.6, z: -pelvis.z };
+        // Use support leg/foot if available
+        const supportFoot = getSupportFootPosition(latestPose.world);
+        if (supportFoot) {
+          trackedPos = { x: supportFoot.x, y: supportFoot.y + 1.6, z: -supportFoot.z };
+          smoothing = 0.85; // stickier when on one foot
+        } else {
+          const pelvis = latestPose.world[23] || latestPose.world[24] || latestPose.world[0];
+          if (pelvis) trackedPos = { x: pelvis.x, y: pelvis.y + 1.6, z: -pelvis.z };
+        }
         updateAvatarFromPose(avatar, latestPose.world, (x,y,z,scale)=>{
           const v = new THREE.Vector3(x, y + 1.6, -z);
           return v;
         });
       } else if (latestPose.landmarks) {
-        const pelvis = latestPose.landmarks[23] || latestPose.landmarks[24] || latestPose.landmarks[0];
-        if (pelvis) {
-          const ndcX = (pelvis.x - 0.5) * 2; const ndcY = -(pelvis.y - 0.5) * 2; const ndcZ = -0.3 - (pelvis.z * 1.6);
+        const supportFoot = getSupportFootPosition(latestPose.landmarks);
+        if (supportFoot) {
+          const ndcX = (supportFoot.x - 0.5) * 2; const ndcY = -(supportFoot.y - 0.5) * 2; const ndcZ = -0.3 - (supportFoot.z * 1.6);
           const v = new THREE.Vector3(ndcX, ndcY, ndcZ); v.unproject(camera);
           trackedPos = { x: v.x, y: v.y, z: v.z };
+          smoothing = 0.85;
+        } else {
+          const pelvis = latestPose.landmarks[23] || latestPose.landmarks[24] || latestPose.landmarks[0];
+          if (pelvis) {
+            const ndcX = (pelvis.x - 0.5) * 2; const ndcY = -(pelvis.y - 0.5) * 2; const ndcZ = -0.3 - (pelvis.z * 1.6);
+            const v = new THREE.Vector3(ndcX, ndcY, ndcZ); v.unproject(camera);
+            trackedPos = { x: v.x, y: v.y, z: v.z };
+          }
         }
         updateAvatarFromPose(avatar, latestPose.landmarks, (x,y,z,scale)=>{
           const ndcX = (x - 0.5) * 2; const ndcY = -(y - 0.5) * 2; const ndcZ = -0.3 - (z * 1.6);
@@ -319,7 +335,15 @@ import { fuseAverages } from './src/multiview.js';
       if (avatar.physicsBody) {
         clampVelocity(avatar.physicsBody, 4);
         clampPosition(avatar.physicsBody, -2, 3);
-        if (trackedPos) syncKinematic(avatar.physicsBody, trackedPos);
+        if (trackedPos) {
+          // Smoothly blend to tracked position for ground contact
+          avatar.physicsBody.position.x = avatar.physicsBody.position.x * (1-smoothing) + trackedPos.x * smoothing;
+          avatar.physicsBody.position.y = avatar.physicsBody.position.y * (1-smoothing) + trackedPos.y * smoothing;
+          avatar.physicsBody.position.z = avatar.physicsBody.position.z * (1-smoothing) + trackedPos.z * smoothing;
+          avatar.physicsBody.velocity.x = 0;
+          avatar.physicsBody.velocity.y = 0;
+          avatar.physicsBody.velocity.z = 0;
+        }
       }
     }
   });
