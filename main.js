@@ -1,4 +1,5 @@
 import { createRenderer, startLoop } from './src/renderer.js';
+import { clampVelocity, clampPosition, syncKinematic } from './src/physics-stabilizer.js';
 import { createTracking } from './src/tracking.js';
 import { createAvatar, updateAvatarFromPose } from './src/avatar.js';
 import { createVRControls } from './src/vr.js';
@@ -37,6 +38,12 @@ import { fuseAverages } from './src/multiview.js';
 
   // avatar
   const avatar = createAvatar(scene);
+  // Example: attach a physics body to the avatar root (stub, replace with real body if needed)
+  avatar.physicsBody = {
+    position: { x: 0, y: 1.6, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    mass: 80
+  };
 
   // HUD for camera status and pose data
   const hud = createHUD(document.body);
@@ -287,16 +294,32 @@ import { fuseAverages } from './src/multiview.js';
   // render loop updates avatar from latest pose
   startLoop(renderer, scene, camera, (dt)=>{
     if (latestPose) {
+      let trackedPos = null;
       if (latestPose.world && latestPose.world.length) {
+        // Use pelvis or hip as root for physics sync
+        const pelvis = latestPose.world[23] || latestPose.world[24] || latestPose.world[0];
+        if (pelvis) trackedPos = { x: pelvis.x, y: pelvis.y + 1.6, z: -pelvis.z };
         updateAvatarFromPose(avatar, latestPose.world, (x,y,z,scale)=>{
           const v = new THREE.Vector3(x, y + 1.6, -z);
           return v;
         });
       } else if (latestPose.landmarks) {
+        const pelvis = latestPose.landmarks[23] || latestPose.landmarks[24] || latestPose.landmarks[0];
+        if (pelvis) {
+          const ndcX = (pelvis.x - 0.5) * 2; const ndcY = -(pelvis.y - 0.5) * 2; const ndcZ = -0.3 - (pelvis.z * 1.6);
+          const v = new THREE.Vector3(ndcX, ndcY, ndcZ); v.unproject(camera);
+          trackedPos = { x: v.x, y: v.y, z: v.z };
+        }
         updateAvatarFromPose(avatar, latestPose.landmarks, (x,y,z,scale)=>{
           const ndcX = (x - 0.5) * 2; const ndcY = -(y - 0.5) * 2; const ndcZ = -0.3 - (z * 1.6);
           const v = new THREE.Vector3(ndcX, ndcY, ndcZ); v.unproject(camera); return v;
         });
+      }
+      // Physics stabilization: clamp and sync
+      if (avatar.physicsBody) {
+        clampVelocity(avatar.physicsBody, 4);
+        clampPosition(avatar.physicsBody, -2, 3);
+        if (trackedPos) syncKinematic(avatar.physicsBody, trackedPos);
       }
     }
   });
