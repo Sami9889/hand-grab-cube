@@ -8,4 +8,23 @@ html,body { height: 100%; margin: 0; background: #05060a; color: var(--text); fo
 .controls { margin-top: 8px; font-size: 12px; color: #a8b7c7; }
 canvas { display: block; }
 
+.controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.controls button { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid rgba(255,255,255,0.06); padding:6px 8px; border-radius:6px; cursor:pointer; font-size:13px; }
+.controls button[aria-pressed="true"] { background: linear-gradient(90deg,var(--accent),var(--accent-2)); color:#04121a; border: none; }
+.control-inline { font-size:12px; display:flex; align-items:center; gap:6px; }
+.control-inline input[type="color"] { width:34px; height:28px; padding:0; border-radius:6px; border: none; }
+.control-inline input[type="range"] { width:120px; }
+
+/* responsive: collapse UI on very small screens */
+@media (max-width:420px){ #ui{ left:8px; right:8px; top:8px; max-width:unset; padding:10px; } .controls{ gap:6px; } .control-inline input[type="range"]{ width:100px; } }
+
+/* event log */
+#eventLog { margin-top:10px; max-height:160px; overflow:auto; font-size:12px; color:#cfeaf6; background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.03); }
+#eventLog .ev { padding:6px; margin-bottom:6px; border-radius:6px; background: rgba(0,0,0,0.18); display:flex; justify-content:space-between; gap:8px; }
+#eventLog .ev small { color:#9fb2c2; }
+/* small numeric input tweak */
+.control-inline input[type="number"]{ background: rgba(255,255,255,0.02); color:var(--text); border:1px solid rgba(255,255,255,0.04); padding:4px; border-radius:4px; }
+button#snapshotBtn{ background: linear-gradient(90deg,var(--accent),var(--accent-2)); color:#04121a; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+.controls label.control-inline{ display:flex; align-items:center; gap:6px; }
+
 /* full-screen Three canvas will be inserted by script */

@@ -1,0 +1,14 @@
+{
+  "name": "etcgrab-cube",
+  "version": "1.0.0",
+  "description": "etcGrab Cube — VR-ready full-body tracking & retargeting base",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "preview": "vite preview --port 5173",
+    "start": "vite"
+  },
+  "devDependencies": {
+    "vite": "^5.1.0"
+  }
+}

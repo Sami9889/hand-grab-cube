@@ -3,15 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hand Grab Cube — Sami9889</title>
+  <title>etcGrab Cube — Sami9889</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="ui">
-    <h1>Hand Grab Cube</h1>
-    <p>Pinch (thumb + index) to grab, move, and throw cubes. Double-pinch or press N to spawn more. Press G to toggle gravity, R to reset.</p>
+    <h1>etcGrab Cube</h1>
+    <p id="instruction">etcGrab Cube — VR-ready full-body tracking & retargeting. Pinch to grab (thumb+index). Use WebXR to enter VR.</p>
     <div id="status">Status: initializing…</div>
-    <div class="controls">N: spawn • G: toggle gravity • R: reset</div>
+
+    <div class="controls" role="group" aria-label="Full body controls">
+      <label class="control-inline">Cameras: <select id="cameraSelect" multiple size="4" style="width:220px"></select></label>
+      <button id="cameraStartBtn">Start Selected Cameras</button>
+      <button id="cameraStopBtn">Stop All Cameras</button>
+      <label class="control-inline">Smoothing: <input id="smoothing" type="range" min="0" max="0.95" step="0.05" value="0.5"></label>
+      <label class="control-inline">HUD: <input id="hudToggle" type="checkbox" checked></label>
+      <button id="hapticsTest">Haptics Test</button>
+    </div>
+    <div id="eventLog" aria-live="polite" aria-atomic="true"></div>
   </div>
 
   <video id="video" autoplay playsinline style="display:none"></video>
@@ -19,8 +28,10 @@
 
   <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
-  <script type="module" src="script.js"></script>
+  <script type="module" src="main.js"></script>
 </body>
 </html>

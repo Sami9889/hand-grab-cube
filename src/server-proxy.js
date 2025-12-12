@@ -1,0 +1,1 @@
+export async function sendToServer(url, payload){ try{ await fetch(url,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}}); }catch(e){console.warn('sendToServer failed',e);} }
