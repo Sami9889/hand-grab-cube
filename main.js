@@ -10,37 +10,6 @@ import { createHUD } from './src/hud.js';
 import { fuseAverages } from './src/multiview.js';
 
 (async function(){
-        // Recording UI and logic
-        let mediaRecorder = null;
-        let recordedChunks = [];
-        const recordBtn = document.getElementById('recordToggle');
-        const recordStatus = document.getElementById('recordStatus');
-        const recordDownload = document.getElementById('recordDownload');
-        if (recordBtn) {
-          recordBtn.addEventListener('click', async ()=>{
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-              mediaRecorder.stop();
-              recordBtn.textContent = 'Start Recording';
-              if (recordStatus) recordStatus.textContent = '';
-            } else {
-              recordedChunks = [];
-              const stream = renderer.domElement.captureStream(30);
-              mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-              mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-              mediaRecorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                recordDownload.href = url;
-                recordDownload.download = 'etcgrab-recording.webm';
-                recordDownload.style.display = 'inline';
-              };
-              mediaRecorder.start();
-              recordBtn.textContent = 'Stop Recording';
-              if (recordStatus) recordStatus.textContent = '● Recording...';
-              recordDownload.style.display = 'none';
-            }
-          });
-        }
       // ragdoll toggle UI
       let ragdoll = null;
       let world = { addBody: ()=>{}, step: ()=>{} }; // stub, replace with real physics world if needed
