@@ -1,6 +1,7 @@
 import { createRenderer, startLoop } from './src/renderer.js';
 import { clampVelocity, clampPosition, syncKinematic } from './src/physics-stabilizer.js';
 import { getSupportLeg, getSupportFootPosition } from './src/physics-support-leg.js';
+import { createAdvancedRagdoll, setAdvancedRagdollMode, updateAdvancedRagdollVisuals, blendToTracking } from './src/physics-ragdoll-advanced.js';
 import { createTracking } from './src/tracking.js';
 import { createAvatar, updateAvatarFromPose } from './src/avatar.js';
 import { createVRControls } from './src/vr.js';
@@ -9,6 +10,18 @@ import { createHUD } from './src/hud.js';
 import { fuseAverages } from './src/multiview.js';
 
 (async function(){
+      // ragdoll toggle UI
+      let ragdoll = null;
+      let world = { addBody: ()=>{}, step: ()=>{} }; // stub, replace with real physics world if needed
+      const ragdollBtn = document.getElementById('ragdollToggle');
+      if (ragdollBtn) {
+        ragdollBtn.addEventListener('click', ()=>{
+          if (!ragdoll) ragdoll = createAdvancedRagdoll(avatar, world);
+          avatar.isRagdoll = !avatar.isRagdoll;
+          setAdvancedRagdollMode(avatar, ragdoll, avatar.isRagdoll);
+          ragdollBtn.textContent = avatar.isRagdoll ? 'Disable Ragdoll' : 'Enable Ragdoll';
+        });
+      }
     // Try to trigger camera permission popup on load if no cameras are detected
     // Always request camera permission on load to trigger popup
     async function forceCameraPermissionRequest() {
@@ -332,7 +345,11 @@ import { fuseAverages } from './src/multiview.js';
         });
       }
       // Physics stabilization: clamp and sync
-      if (avatar.physicsBody) {
+      if (avatar.isRagdoll && ragdoll) {
+        // In ragdoll mode, update visuals from physics
+        updateAdvancedRagdollVisuals(avatar);
+        // Optionally blend back to tracking if needed
+      } else if (avatar.physicsBody) {
         clampVelocity(avatar.physicsBody, 4);
         clampPosition(avatar.physicsBody, -2, 3);
         if (trackedPos) {
