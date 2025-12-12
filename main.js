@@ -7,6 +7,18 @@ import { createHUD } from './src/hud.js';
 import { fuseAverages } from './src/multiview.js';
 
 (async function(){
+    // Try to trigger camera permission popup on load if no cameras are detected
+    // Always request camera permission on load to trigger popup
+    async function forceCameraPermissionRequest() {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        await refreshCameras();
+      } catch (e) {
+        console.warn('Camera permission request failed', e);
+        if (statusEl) statusEl.textContent = 'Status: Camera permission denied or unavailable.';
+      }
+    }
+
   const { scene, camera, renderer, helpers, stats } = await createRenderer();
   document.body.appendChild(renderer.domElement);
   // status element
@@ -54,7 +66,8 @@ import { fuseAverages } from './src/multiview.js';
       if (statusEl) statusEl.textContent = 'Status: Unable to enumerate cameras. Permission denied or not supported.';
     }
   }
-  refreshCameras();
+  await refreshCameras();
+  await forceCameraPermissionRequest();
   if (cameraStartBtn && cameraSelect) cameraStartBtn.addEventListener('click', async ()=>{
     const selected = Array.from(cameraSelect.selectedOptions).map(o=>o.value);
     if (!selected || selected.length===0) {
@@ -63,19 +76,31 @@ import { fuseAverages } from './src/multiview.js';
     }
     // create video elements per camera and start pose capture
     let started = 0;
+    let failed = 0;
     for (let i=0;i<selected.length;i++){
-      const id = selected[i]; const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.style.display='none'; document.body.appendChild(v);
+      const id = selected[i];
+      const v = document.createElement('video');
+      v.autoplay = true;
+      v.playsInline = true;
+      v.style.display='none';
+      document.body.appendChild(v);
       try {
-        const handle = tracking.startCamera(v, { deviceId: id });
+        // Await the camera start to catch async errors
+        const handle = await tracking.startCamera(v, { deviceId: id });
         activeCamHandles.push(handle);
         started++;
       } catch(e) {
+        failed++;
         console.warn('Camera start failed', e);
-        if (statusEl) statusEl.textContent = 'Status: Camera permission denied or unavailable.';
+        if (statusEl) statusEl.textContent = 'Status: Camera permission denied, unavailable, or getUserMedia failed.';
       }
     }
-    if (statusEl) statusEl.textContent = started > 0 ? `Status: Started ${started} camera(s)` : 'Status: No cameras started.';
-    alert('Started ' + started + ' camera(s)');
+    if (statusEl) {
+      if (started > 0 && failed === 0) statusEl.textContent = `Status: Started ${started} camera(s)`;
+      else if (started > 0 && failed > 0) statusEl.textContent = `Status: Started ${started} camera(s), failed to start ${failed}`;
+      else statusEl.textContent = 'Status: No cameras started. Check permissions or device availability.';
+    }
+    alert(`Started ${started} camera(s)` + (failed > 0 ? `, failed: ${failed}` : ''));
   });
   if (cameraStopBtn) cameraStopBtn.addEventListener('click', ()=>{ activeCamHandles.forEach(h=>{ try{ tracking.stopCamera(h); if (h && h.videoEl && h.videoEl.parentNode) h.videoEl.parentNode.removeChild(h.videoEl); }catch(e){} }); activeCamHandles.length=0; alert('Stopped cameras'); });
   ui.on('trackingMode', (e)=>{ tracking.setActive(e.target.value); overlayCtx.clearRect(0,0,overlay.width,overlay.height); });
