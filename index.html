@@ -4,13 +4,46 @@
 <!doctype html>
 <html lang="en">
 <head>
- <script
-  src="https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js"
-  crossorigin="anonymous"
-></script>
+ <script>
+  // Robust Sentry error handling - wrap Sentry loading with try-catch
+  (function() {
+    try {
+      const sentryScript = document.createElement('script');
+      sentryScript.src = 'https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js';
+      sentryScript.crossOrigin = 'anonymous';
+      sentryScript.onerror = function(e) {
+        console.warn('[WARN] Sentry CDN load failed, continuing without Sentry:', e);
+        // Prevent error from bubbling up
+        return true;
+      };
+      document.currentScript.parentNode.insertBefore(sentryScript, document.currentScript.nextSibling);
+    } catch (e) {
+      console.warn('[WARN] Failed to initialize Sentry:', e);
+    }
+    
+    // Global error handler for Sentry-related errors
+    window.addEventListener('error', (e) => {
+      if (e.message && (e.message.includes('Load failed') || e.message.includes('sentry') || e.message.includes('ingest.de.sentry.io'))) {
+        console.warn('[WARN] Sentry error caught and suppressed:', e.message);
+        e.preventDefault();
+        return true;
+      }
+    }, true);
+    
+    // Handle unhandled promise rejections from Sentry
+    window.addEventListener('unhandledrejection', (e) => {
+      if (e.reason && (String(e.reason).includes('sentry') || String(e.reason).includes('ingest.de.sentry.io'))) {
+        console.warn('[WARN] Sentry promise rejection caught and suppressed:', e.reason);
+        e.preventDefault();
+        return true;
+      }
+    }, true);
+  })();
+</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>etcGrab Cube — Sami9889</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
