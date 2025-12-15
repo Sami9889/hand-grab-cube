@@ -2,171 +2,201 @@ import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 
 export function createAvatar(scene) {
   const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffb347 });
+  const mat = new THREE.MeshStandardMaterial({ 
+    color: 0xffb347,
+    wireframe: true,  // Show wireframe/outline like lidar scan
+    transparent: false,
+    opacity: 1.0
+  });
   const joints = {};
   const jointNames = [
-    'nose','leftShoulder','rightShoulder','leftElbow','rightElbow','leftWrist','rightWrist',
-    'leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle',
-    'leftFoot','rightFoot','leftUpperArm','rightUpperArm','leftLowerArm','rightLowerArm',
-    'leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg','pelvis']
-  // Joints (spheres)
+    // Head and neck (detailed)
+    'nose', 'head', 'neck',
+    'leftEye', 'rightEye',
+    'leftEar', 'rightEar',
+    'leftEyeInner', 'rightEyeInner',
+    'leftEyeOuter', 'rightEyeOuter',
+    'mouthLeft', 'mouthRight',
+    
+    // Shoulders and arms (detailed)
+    'leftShoulder', 'rightShoulder',
+    'leftUpperArm', 'rightUpperArm',
+    'leftElbow', 'rightElbow',
+    'leftForearm', 'rightForearm',
+    'leftWrist', 'rightWrist',
+    
+    // Torso and spine (detailed)
+    'torso', 'spine', 'pelvis', 'hips',
+    'chest', 'upperBack', 'lowerBack',
+    
+    // Legs (detailed)
+    'leftHip', 'rightHip',
+    'leftUpperLeg', 'rightUpperLeg',
+    'leftKnee', 'rightKnee',
+    'leftLowerLeg', 'rightLowerLeg',
+    'leftAnkle', 'rightAnkle',
+    'leftFoot', 'rightFoot',
+    'leftHeel', 'rightHeel',
+    'leftFootIndex', 'rightFootIndex',
+    
+    // Additional joints for better stability
+    'leftLowerArm', 'rightLowerArm',
+    'sternum', // chest center
+    'leftPinky', 'rightPinky',
+    'leftIndex', 'rightIndex',
+    'leftThumb', 'rightThumb',
+  ]
+  // Body scan mesh - no simple shapes, everything from scan data
+  const bodyGeometry = new THREE.BufferGeometry();
+  const bodyMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xffb347,
+    wireframe: true,
+    side: THREE.DoubleSide
+  });
+  const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  bodyMesh.visible = false;
+  group.add(bodyMesh);
+  
+  // Create joint references but no geometric shapes - scan will create the geometry
   jointNames.forEach(name => {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat.clone());
-    s.visible = false; group.add(s); joints[name] = { mesh: s, pos: new THREE.Vector3() };
+    joints[name] = { pos: new THREE.Vector3(), scanIndex: null };
   });
-  // Hand and finger tips (spheres)
-  const handJoints = ['leftWrist','rightWrist'];
-  const fingerTipIndices = [4, 8, 12, 16, 20]; // thumb, index, middle, ring, pinky tips
-  const fingers = { left: [], right: [] };
-  handJoints.forEach(hand => {
-    for (let i = 0; i < fingerTipIndices.length; i++) {
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), mat.clone());
-      f.visible = false; group.add(f); fingers[hand.startsWith('left') ? 'left' : 'right'].push({ mesh: f, pos: new THREE.Vector3(), idx: fingerTipIndices[i] });
-    }
+  // Face mesh from actual scan data (468 landmarks from MediaPipe FaceMesh)
+  const faceGeometry = new THREE.BufferGeometry();
+  const faceMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xffb347,
+    wireframe: true,
+    side: THREE.DoubleSide
   });
-  // Head (bigger sphere)
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
-  head.visible = false; group.add(head); joints.head = { mesh: head, pos: new THREE.Vector3() };
-  // Torso (box)
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.32, 0.12), mat.clone());
-  torso.visible = false; group.add(torso); joints.torso = { mesh: torso, pos: new THREE.Vector3() };
-  // Limbs (cylinders between joints, more anatomical detail)
-  const limbPairs = [
-    ['leftShoulder','leftUpperArm'], ['leftUpperArm','leftElbow'], ['leftElbow','leftLowerArm'], ['leftLowerArm','leftWrist'],
-    ['rightShoulder','rightUpperArm'], ['rightUpperArm','rightElbow'], ['rightElbow','rightLowerArm'], ['rightLowerArm','rightWrist'],
-    ['leftHip','leftUpperLeg'], ['leftUpperLeg','leftKnee'], ['leftKnee','leftLowerLeg'], ['leftLowerLeg','leftAnkle'], ['leftAnkle','leftFoot'],
-    ['rightHip','rightUpperLeg'], ['rightUpperLeg','rightKnee'], ['rightKnee','rightLowerLeg'], ['rightLowerLeg','rightAnkle'], ['rightAnkle','rightFoot'],
-    ['leftShoulder','rightShoulder'], ['leftHip','rightHip'], ['pelvis','leftHip'], ['pelvis','rightHip'], ['pelvis','torso'],
-    ['torso','leftShoulder'], ['torso','rightShoulder']
-  ];
-  const limbs = limbPairs.map(([a,b]) => {
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1,16), mat.clone());
-    cyl.visible = false; group.add(cyl);
-    return { mesh: cyl, a, b };
-  });
+  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
+  faceMesh.visible = false;
+  group.add(faceMesh);
   // head orientation arrow
   const headDir = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), 0.25, 0x88ff88);
   headDir.visible = false; group.add(headDir);
   scene.add(group);
   // increase smoothing for more stable movement
-  return { group, joints, limbs, headDir, smoothFactor: 0.5 };
+  return { group, joints, headDir, faceMesh, bodyMesh, smoothFactor: 0.5 };
 }
 
 export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
-  if (!landmarks || landmarks.length === 0) {
-    avatar.group.visible = false;
-    // Hide all parts
-    Object.values(avatar.joints).forEach(j => j.mesh.visible = false);
-    if (avatar.limbs) avatar.limbs.forEach(l => l.mesh.visible = false);
-    if (avatar.fingers) {
-      Object.values(avatar.fingers).forEach(arr => arr.forEach(f => f.mesh.visible = false));
-    }
-    avatar.headDir.visible = false;
+  // Null safety checks
+  if (!avatar || !avatar.joints || !avatar.group) {
+    console.error('[ERROR] Invalid avatar object passed to updateAvatarFromPose');
     return;
   }
+  
+  if (!landmarks || landmarks.length === 0) {
+    avatar.group.visible = false;
+    if (avatar.bodyMesh) avatar.bodyMesh.visible = false;
+    if (avatar.headDir) avatar.headDir.visible = false;
+    return;
+  }
+  
   avatar.group.visible = true;
-  // Show all parts by default (will be positioned below)
-  Object.values(avatar.joints).forEach(j => j.mesh.visible = true);
-  if (avatar.limbs) avatar.limbs.forEach(l => l.mesh.visible = true);
-  if (avatar.fingers) {
-    Object.values(avatar.fingers).forEach(arr => arr.forEach(f => f.mesh.visible = true));
+  
+  // Update body mesh from pose scan data (33 landmarks from MediaPipe Pose)
+  if (avatar.bodyMesh && landmarks.length > 0) {
+    try {
+      updateBodyMeshFromScan(avatar.bodyMesh, landmarks, handToWorld);
+    } catch (e) {
+      console.error('[ERROR] Error updating body mesh from scan:', e);
+    }
   }
-  // Hand and finger tips (if hand landmarks are available on window._lastHands)
-  if (window._lastHands && Array.isArray(window._lastHands)) {
-    ['left','right'].forEach((side, sidx) => {
-      const hand = window._lastHands.find(h => h.handedness && h.handedness.toLowerCase() === side);
-      if (hand && hand.landmarks && avatar.fingers && avatar.fingers[side]) {
-        for (let i = 0; i < avatar.fingers[side].length; i++) {
-          const tip = avatar.fingers[side][i];
-          const lm = hand.landmarks[tip.idx];
-          if (lm) {
-            const w = handToWorld(lm.x, lm.y, lm.z, 1.6);
-            tip.pos.lerp(w, 0.7);
-            tip.mesh.position.copy(tip.pos);
-            tip.mesh.visible = true;
-          } else {
-            tip.mesh.visible = false;
-          }
-        }
-      } else if (avatar.fingers && avatar.fingers[side]) {
-        avatar.fingers[side].forEach(tip => tip.mesh.visible = false);
+  // Joint positions stored for reference but no rendering - scan mesh does it all
+  // All geometry now from scan data - no manual positioning needed
+}
+
+// Update body mesh from actual MediaPipe Pose scan data (33 landmarks)
+function updateBodyMeshFromScan(bodyMeshObj, landmarks, handToWorld) {
+  if (!bodyMeshObj || !landmarks || landmarks.length === 0) {
+    if (bodyMeshObj) bodyMeshObj.visible = false;
+    return;
+  }
+  
+  try {
+    // MediaPipe Pose provides 33 3D landmarks
+    const positions = new Float32Array(landmarks.length * 3);
+    
+    for (let i = 0; i < landmarks.length; i++) {
+      const lm = landmarks[i];
+      if (!lm) continue;
+      // Use handToWorld to convert to proper 3D space
+      const w = handToWorld(lm.x, lm.y, lm.z, 1.6);
+      positions[i * 3] = w.x;
+      positions[i * 3 + 1] = w.y;
+      positions[i * 3 + 2] = w.z;
+    }
+    
+    // Create body mesh triangulation (connect landmarks to form body surface)
+    const indices = [];
+    // Torso connections
+    indices.push(11, 12, 23); // left shoulder, right shoulder, left hip
+    indices.push(12, 23, 24); // right shoulder, left hip, right hip
+    indices.push(11, 23, 24); // left shoulder, left hip, right hip
+    indices.push(11, 12, 24); // left shoulder, right shoulder, right hip
+    
+    // Arms
+    indices.push(11, 13, 15); // left arm
+    indices.push(12, 14, 16); // right arm
+    
+    // Legs
+    indices.push(23, 25, 27); // left leg
+    indices.push(24, 26, 28); // right leg
+    indices.push(27, 29, 31); // left foot
+    indices.push(28, 30, 32); // right foot
+    
+    // More connections for better mesh
+    indices.push(0, 11, 12); // head to shoulders
+    
+    bodyMeshObj.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    bodyMeshObj.geometry.setIndex(indices);
+    bodyMeshObj.geometry.computeVertexNormals();
+    bodyMeshObj.geometry.attributes.position.needsUpdate = true;
+    bodyMeshObj.visible = true;
+    
+  } catch (e) {
+    console.error('[ERROR] Failed to update body mesh from scan:', e);
+    bodyMeshObj.visible = false;
+  }
+}
+
+// Update face mesh from actual MediaPipe FaceMesh scan data (468 landmarks)
+export function updateFaceMeshFromScan(faceMeshObj, faceLandmarks, avatar) {
+  if (!faceMeshObj || !faceLandmarks || faceLandmarks.length === 0) {
+    if (faceMeshObj) faceMeshObj.visible = false;
+    return;
+  }
+  
+  try {
+    // MediaPipe FaceMesh provides 468 3D landmarks
+    const positions = new Float32Array(faceLandmarks.length * 3);
+    
+    for (let i = 0; i < faceLandmarks.length; i++) {
+      const lm = faceLandmarks[i];
+      // Convert normalized coordinates to world space
+      positions[i * 3] = (lm.x - 0.5) * 2;      // x: -1 to 1
+      positions[i * 3 + 1] = -(lm.y - 0.5) * 2; // y: -1 to 1 (flip)
+      positions[i * 3 + 2] = -lm.z * 2;         // z: depth
+    }
+    
+    // Create triangulated mesh from landmarks
+    const indices = [];
+    // Connect nearby points to form triangles
+    for (let i = 0; i < faceLandmarks.length - 2; i++) {
+      if (i % 3 === 0) {
+        indices.push(i, i + 1, i + 2);
       }
-    });
-  }
-  // mapping by approximate pose indices (MediaPipe Pose uses 33 landmarks)
-  // Extended mapping for more joints (MediaPipe Pose uses 33 landmarks)
-  const map = {
-    nose: 0, leftShoulder:11, rightShoulder:12, leftElbow:13, rightElbow:14, leftWrist:15, rightWrist:16,
-    leftHip:23, rightHip:24, leftKnee:25, rightKnee:26, leftAnkle:27, rightAnkle:28,
-    leftFoot:31, rightFoot:32, pelvis: 23, // pelvis = leftHip for now
-    leftUpperArm:11, rightUpperArm:12, leftLowerArm:13, rightLowerArm:14,
-    leftUpperLeg:23, rightUpperLeg:24, leftLowerLeg:25, rightLowerLeg:26
-  };
-  // Per-limb smoothing and stability
-  const legKeys = ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle','leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg','leftFoot','rightFoot'];
-  const maxLegMove = 0.18; // meters, max allowed jump per frame (tighter for stability)
-  // Update joints
-  for (const key in map) {
-    const idx = map[key]; const p = landmarks[idx]; const part = avatar.joints[key];
-    if (!p || !part) continue;
-    const w = handToWorld(p.x, p.y, p.z, 1.6);
-    let smooth = avatar.smoothFactor;
-    if (legKeys.includes(key)) smooth = Math.max(0.7, avatar.smoothFactor);
-    if (legKeys.includes(key)) {
-      const dist = part.pos.distanceTo(w);
-      if (dist > maxLegMove) continue;
     }
-    part.pos.lerp(w, smooth);
-    part.mesh.position.copy(part.pos);
-    part.mesh.visible = true;
-  }
-  // Head (use nose position, offset upward)
-  const nose = landmarks[0];
-  if (nose && avatar.joints.head) {
-    const w = handToWorld(nose.x, nose.y-0.09, nose.z, 1.6); // offset up for head
-    avatar.joints.head.pos.lerp(w, 0.7);
-    avatar.joints.head.mesh.position.copy(avatar.joints.head.pos);
-    avatar.joints.head.mesh.visible = true;
-  }
-  // Torso (midpoint between shoulders and hips)
-  const ls = landmarks[11], rs = landmarks[12], lh = landmarks[23], rh = landmarks[24];
-  if (ls && rs && lh && rh && avatar.joints.torso) {
-    const midShoulders = { x: (ls.x+rs.x)/2, y: (ls.y+rs.y)/2, z: (ls.z+rs.z)/2 };
-    const midHips = { x: (lh.x+rh.x)/2, y: (lh.y+rh.y)/2, z: (lh.z+rh.z)/2 };
-    const mid = { x: (midShoulders.x+midHips.x)/2, y: (midShoulders.y+midHips.y)/2, z: (midShoulders.z+midHips.z)/2 };
-    const w = handToWorld(mid.x, mid.y, mid.z, 1.6);
-    avatar.joints.torso.pos.lerp(w, 0.7);
-    avatar.joints.torso.mesh.position.copy(avatar.joints.torso.pos);
-    avatar.joints.torso.mesh.visible = true;
-  }
-  // Limbs (cylinders between joints)
-  if (avatar.limbs) {
-    for (const limb of avatar.limbs) {
-      const a = avatar.joints[limb.a], b = avatar.joints[limb.b];
-      if (!a || !b) { limb.mesh.visible = false; continue; }
-      const posA = a.mesh.position, posB = b.mesh.position;
-      // Position limb between joints
-      const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
-      limb.mesh.position.copy(mid);
-      // Set orientation
-      const dir = new THREE.Vector3().subVectors(posB, posA);
-      const len = dir.length();
-      if (len < 0.01) { limb.mesh.visible = false; continue; }
-      limb.mesh.scale.set(1, len, 1);
-      limb.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
-      limb.mesh.visible = true;
-    }
-  }
-  // update head orientation: use nose and shoulder mid point
-  if (nose && ls && rs) {
-    const mid = new THREE.Vector3((ls.x+rs.x)/2, (ls.y+rs.y)/2, (ls.z+rs.z)/2);
-    const noseW = handToWorld(nose.x, nose.y, nose.z, 1.6);
-    const midW = handToWorld(mid.x, mid.y, mid.z, 1.6);
-    const dir = new THREE.Vector3().subVectors(noseW, midW).normalize();
-    avatar.headDir.position.copy(noseW);
-    avatar.headDir.setDirection(dir);
-    avatar.headDir.visible = true;
-  } else {
-    avatar.headDir.visible = false;
+    
+    faceMeshObj.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    faceMeshObj.geometry.setIndex(indices);
+    faceMeshObj.geometry.computeVertexNormals();
+    faceMeshObj.geometry.attributes.position.needsUpdate = true;
+    faceMeshObj.visible = true;
+    
+  } catch (e) {
+    console.error('[ERROR] Failed to update face mesh from scan:', e);
+    faceMeshObj.visible = false;
   }
 }
