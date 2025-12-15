@@ -7,44 +7,33 @@
  <script>
   // Robust Sentry error handling - wrap Sentry loading with try-catch
   (function() {
-    // Override console.warn temporarily to suppress Sentry warnings
-    const originalWarn = console.warn;
-    const sentryWarningFilter = function(...args) {
-      const msg = args.join(' ');
-      if (!msg.includes('Sentry') && !msg.includes('sentry') && !msg.includes('ingest.de.sentry.io')) {
-        originalWarn.apply(console, args);
-      }
-      // Silently ignore Sentry warnings
-    };
-    
     try {
       const sentryScript = document.createElement('script');
       sentryScript.src = 'https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js';
       sentryScript.crossOrigin = 'anonymous';
       sentryScript.onerror = function(e) {
-        // Silently fail - no console output
+        console.warn('[WARN] Sentry CDN load failed, continuing without Sentry:', e);
+        // Prevent error from bubbling up
         return true;
       };
       document.currentScript.parentNode.insertBefore(sentryScript, document.currentScript.nextSibling);
     } catch (e) {
-      // Silently fail
+      console.warn('[WARN] Failed to initialize Sentry:', e);
     }
     
-    // Global error handler for Sentry-related errors - completely silent
+    // Global error handler for Sentry-related errors
     window.addEventListener('error', (e) => {
-      if (e.message && (e.message.includes('Load failed') || e.message.includes('sentry') || e.message.includes('ingest') || e.filename && e.filename.includes('sentry'))) {
-        e.stopImmediatePropagation();
+      if (e.message && (e.message.includes('Load failed') || e.message.includes('sentry') || e.message.includes('ingest.de.sentry.io'))) {
+        console.warn('[WARN] Sentry error caught and suppressed:', e.message);
         e.preventDefault();
         return true;
       }
     }, true);
     
-    // Handle unhandled promise rejections from Sentry - completely silent
+    // Handle unhandled promise rejections from Sentry
     window.addEventListener('unhandledrejection', (e) => {
-      const reasonStr = String(e.reason);
-      const stackStr = e.reason && e.reason.stack ? String(e.reason.stack) : '';
-      if (reasonStr.includes('sentry') || reasonStr.includes('ingest') || stackStr.includes('sentry') || stackStr.includes('browser.sentry-cdn.com')) {
-        e.stopImmediatePropagation();
+      if (e.reason && (String(e.reason).includes('sentry') || String(e.reason).includes('ingest.de.sentry.io'))) {
+        console.warn('[WARN] Sentry promise rejection caught and suppressed:', e.reason);
         e.preventDefault();
         return true;
       }

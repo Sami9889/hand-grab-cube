@@ -61,7 +61,11 @@ export function createAvatar(scene) {
       f.visible = false; group.add(f); fingers[hand.startsWith('left') ? 'left' : 'right'].push({ mesh: f, pos: new THREE.Vector3(), idx: fingerTipIndices[i] });
     }
   });
-  // Face mesh from actual scan data (468 landmarks from MediaPipe FaceMesh) - NO simple sphere head
+  // Head - will be replaced with actual face mesh from scan data
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
+  head.visible = false; group.add(head); joints.head = { mesh: head, pos: new THREE.Vector3() };
+  
+  // Face mesh from actual scan data (468 landmarks from MediaPipe FaceMesh)
   const faceGeometry = new THREE.BufferGeometry();
   const faceMaterial = new THREE.MeshStandardMaterial({ 
     color: 0xffb347,
@@ -299,6 +303,14 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
   } catch (e) {
     console.error('[ERROR] Error updating joints:', e);
   }
+  // Head (use nose position, offset upward)
+  const nose = landmarks[0];
+  if (nose && avatar.joints.head) {
+    const w = handToWorld(nose.x, nose.y-0.09, nose.z, 1.6); // offset up for head
+    avatar.joints.head.pos.lerp(w, 0.7);
+    avatar.joints.head.mesh.position.copy(avatar.joints.head.pos);
+    avatar.joints.head.mesh.visible = true;
+  }
   // Head removed - using scanned face mesh instead
   // Torso (midpoint between shoulders and hips)
   const ls = landmarks[11], rs = landmarks[12], lh = landmarks[23], rh = landmarks[24];
@@ -361,14 +373,13 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
 }
 
 // New function to update face mesh from actual MediaPipe FaceMesh scan data
-export function updateFaceMeshFromScan(faceMeshObj, faceLandmarks, avatar) {
+export function updateFaceMeshFromScan(faceMeshObj, faceLandmarks) {
   if (!faceMeshObj || !faceLandmarks || faceLandmarks.length === 0) {
     if (faceMeshObj) faceMeshObj.visible = false;
     return;
   }
   
   try {
-    
     // MediaPipe FaceMesh provides 468 3D landmarks
     const positions = new Float32Array(faceLandmarks.length * 3);
     
