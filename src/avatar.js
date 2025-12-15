@@ -54,6 +54,7 @@ export function createAvatar(scene) {
   // Head
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
   head.visible = false; group.add(head); joints.head = { mesh: head, pos: new THREE.Vector3() };
+  
   // Torso (box)
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.32, 0.12), mat.clone());
   torso.visible = false; group.add(torso); joints.torso = { mesh: torso, pos: new THREE.Vector3() };
