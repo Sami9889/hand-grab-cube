@@ -51,28 +51,10 @@ export function createAvatar(scene) {
     const s = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat.clone());
     s.visible = false; group.add(s); joints[name] = { mesh: s, pos: new THREE.Vector3() };
   });
-  const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  bodyMesh.visible = false;
-  group.add(bodyMesh);
-  
-  // Create joint references but no geometric shapes - scan will create the geometry
-  jointNames.forEach(name => {
-    joints[name] = { pos: new THREE.Vector3(), scanIndex: null };
-  });
-  // Head - will be replaced with actual face mesh from scan data
+  // Head
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
   head.visible = false; group.add(head); joints.head = { mesh: head, pos: new THREE.Vector3() };
   
-  // Face mesh from actual scan data (468 landmarks from MediaPipe FaceMesh)
-  const faceGeometry = new THREE.BufferGeometry();
-  const faceMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xffb347,
-    wireframe: true,
-    side: THREE.DoubleSide
-  });
-  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
-  faceMesh.visible = false;
-  group.add(faceMesh);
   // Torso (box)
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.32, 0.12), mat.clone());
   torso.visible = false; group.add(torso); joints.torso = { mesh: torso, pos: new THREE.Vector3() };
@@ -101,15 +83,12 @@ export function createAvatar(scene) {
     cyl.visible = false; group.add(cyl);
     return { mesh: cyl, a, b };
   });
-  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
-  faceMesh.visible = false;
-  group.add(faceMesh);
   // head orientation arrow
   const headDir = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), 0.25, 0x88ff88);
   headDir.visible = false; group.add(headDir);
   scene.add(group);
   // increase smoothing for more stable movement
-  return { group, joints, limbs, headDir, faceMesh, smoothFactor: 0.5 };
+  return { group, joints, limbs, headDir, smoothFactor: 0.5 };
 }
 
 export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
@@ -358,66 +337,5 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     } catch (e) {
       console.error('[ERROR] Error updating limbs:', e);
     }
-    
-    // Create triangulated mesh from landmarks
-    const indices = [];
-    // Connect nearby points to form triangles
-    for (let i = 0; i < faceLandmarks.length - 2; i++) {
-      if (i % 3 === 0) {
-        indices.push(i, i + 1, i + 2);
-      }
-    }
-    
-    faceMeshObj.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    faceMeshObj.geometry.setIndex(indices);
-    faceMeshObj.geometry.computeVertexNormals();
-    faceMeshObj.geometry.attributes.position.needsUpdate = true;
-    faceMeshObj.visible = true;
-    
-  } catch (e) {
-    console.error('[ERROR] Failed to update face mesh from scan:', e);
-    faceMeshObj.visible = false;
-  }
-}
-
-// New function to update face mesh from actual MediaPipe FaceMesh scan data
-export function updateFaceMeshFromScan(faceMeshObj, faceLandmarks) {
-  if (!faceMeshObj || !faceLandmarks || faceLandmarks.length === 0) {
-    if (faceMeshObj) faceMeshObj.visible = false;
-    return;
-  }
-  
-  try {
-    // MediaPipe FaceMesh provides 468 3D landmarks
-    const positions = new Float32Array(faceLandmarks.length * 3);
-    
-    for (let i = 0; i < faceLandmarks.length; i++) {
-      const lm = faceLandmarks[i];
-      // Convert normalized coordinates to world space
-      positions[i * 3] = (lm.x - 0.5) * 2;      // x: -1 to 1
-      positions[i * 3 + 1] = -(lm.y - 0.5) * 2; // y: -1 to 1 (flip)
-      positions[i * 3 + 2] = -lm.z * 2;         // z: depth
-    }
-    
-    // Create triangulated mesh from landmarks (MediaPipe provides canonical face topology)
-    // Using Delaunay-like triangulation for face mesh
-    const indices = [];
-    // MediaPipe face mesh canonical triangulation (simplified for wireframe)
-    // Connect nearby points to form triangles
-    for (let i = 0; i < faceLandmarks.length - 2; i++) {
-      if (i % 3 === 0) { // Create triangles
-        indices.push(i, i + 1, i + 2);
-      }
-    }
-    
-    faceMeshObj.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    faceMeshObj.geometry.setIndex(indices);
-    faceMeshObj.geometry.computeVertexNormals();
-    faceMeshObj.geometry.attributes.position.needsUpdate = true;
-    faceMeshObj.visible = true;
-    
-  } catch (e) {
-    console.error('[ERROR] Failed to update face mesh from scan:', e);
-    faceMeshObj.visible = false;
   }
 }
