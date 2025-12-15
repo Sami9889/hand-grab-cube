@@ -4,7 +4,7 @@ import { clampVelocity, clampPosition, syncKinematic } from './src/physics-stabi
 import { getSupportLeg, getSupportFootPosition } from './src/physics-support-leg.js';
 import { createAdvancedRagdoll, setAdvancedRagdollMode, updateAdvancedRagdollVisuals, blendToTracking } from './src/physics-ragdoll-advanced.js';
 import { createTracking } from './src/tracking.js';
-import { createAvatar, updateAvatarFromPose } from './src/avatar.js';
+import { createAvatar, updateAvatarFromPose, updateFaceMeshFromScan } from './src/avatar.js';
 import { createVRControls } from './src/vr.js';
 import { createUI } from './src/ui.js';
 import { createHUD } from './src/hud.js';
@@ -303,6 +303,10 @@ console.warn = function(...args) {
       const lm = ev.data && ev.data.landmarks ? ev.data.landmarks : ev.data;
       smoothedFace = smoothLandmarks(smoothedFace, lm, smoothing);
       if (showFace) draw2DFace(overlayCtx, smoothedFace);
+      // Update avatar face mesh with actual scan data
+      if (avatar && avatar.faceMesh && smoothedFace && smoothedFace.length > 0) {
+        updateFaceMeshFromScan(avatar.faceMesh, smoothedFace);
+      }
       return;
     }
   }
