@@ -63,16 +63,6 @@ export function createAvatar(scene) {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
   head.visible = false; group.add(head); joints.head = { mesh: head, pos: new THREE.Vector3() };
   
-  // Face mesh from actual scan data (468 landmarks from MediaPipe FaceMesh)
-  const faceGeometry = new THREE.BufferGeometry();
-  const faceMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xffb347,
-    wireframe: true,
-    side: THREE.DoubleSide
-  });
-  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
-  faceMesh.visible = false;
-  group.add(faceMesh);
   // Torso (box)
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.32, 0.12), mat.clone());
   torso.visible = false; group.add(torso); joints.torso = { mesh: torso, pos: new THREE.Vector3() };
@@ -101,15 +91,12 @@ export function createAvatar(scene) {
     cyl.visible = false; group.add(cyl);
     return { mesh: cyl, a, b };
   });
-  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
-  faceMesh.visible = false;
-  group.add(faceMesh);
   // head orientation arrow
   const headDir = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), 0.25, 0x88ff88);
   headDir.visible = false; group.add(headDir);
   scene.add(group);
   // increase smoothing for more stable movement
-  return { group, joints, limbs, headDir, faceMesh, smoothFactor: 0.5 };
+  return { group, joints, limbs, headDir, smoothFactor: 0.5 };
 }
 
 export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
