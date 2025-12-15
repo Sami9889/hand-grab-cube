@@ -1,13 +1,34 @@
+import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 import { createRenderer, startLoop } from './src/renderer.js';
 import { clampVelocity, clampPosition, syncKinematic } from './src/physics-stabilizer.js';
 import { getSupportLeg, getSupportFootPosition } from './src/physics-support-leg.js';
 import { createAdvancedRagdoll, setAdvancedRagdollMode, updateAdvancedRagdollVisuals, blendToTracking } from './src/physics-ragdoll-advanced.js';
 import { createTracking } from './src/tracking.js';
-import { createAvatar, updateAvatarFromPose } from './src/avatar.js';
+import { createAvatar, updateAvatarFromPose, updateFaceMeshFromScan } from './src/avatar.js';
 import { createVRControls } from './src/vr.js';
 import { createUI } from './src/ui.js';
 import { createHUD } from './src/hud.js';
 import { fuseAverages } from './src/multiview.js';
+
+// Enhanced error reporting for debugging
+window.addEventListener('error', (event) => {
+  console.error('Global Error:', event.message, event.filename, event.lineno, event.colno, event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled Promise Rejection:', event.reason);
+});
+
+// Also log all THREE.Vector3 and constructor calls
+const originalError = console.error;
+console.error = function(...args) {
+  originalError.apply(console, ['[ERROR]', ...args]);
+};
+
+const originalWarn = console.warn;
+console.warn = function(...args) {
+  originalWarn.apply(console, ['[WARN]', ...args]);
+};
 
 (async function(){
       // ragdoll toggle UI
@@ -282,6 +303,10 @@ import { fuseAverages } from './src/multiview.js';
       const lm = ev.data && ev.data.landmarks ? ev.data.landmarks : ev.data;
       smoothedFace = smoothLandmarks(smoothedFace, lm, smoothing);
       if (showFace) draw2DFace(overlayCtx, smoothedFace);
+      // Update avatar face mesh with actual scan data (pass avatar to hide old head)
+      if (avatar && avatar.faceMesh && smoothedFace && smoothedFace.length > 0) {
+        updateFaceMeshFromScan(avatar.faceMesh, smoothedFace, avatar);
+      }
       return;
     }
   }
