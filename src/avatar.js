@@ -5,10 +5,42 @@ export function createAvatar(scene) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffb347 });
   const joints = {};
   const jointNames = [
-    'nose','leftShoulder','rightShoulder','leftElbow','rightElbow','leftWrist','rightWrist',
-    'leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle',
-    'leftFoot','rightFoot','leftUpperArm','rightUpperArm','leftLowerArm','rightLowerArm',
-    'leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg','pelvis']
+    // Head and neck (detailed)
+    'nose', 'head', 'neck',
+    'leftEye', 'rightEye',
+    'leftEar', 'rightEar',
+    'leftEyeInner', 'rightEyeInner',
+    'leftEyeOuter', 'rightEyeOuter',
+    'mouthLeft', 'mouthRight',
+    
+    // Shoulders and arms (detailed)
+    'leftShoulder', 'rightShoulder',
+    'leftUpperArm', 'rightUpperArm',
+    'leftElbow', 'rightElbow',
+    'leftForearm', 'rightForearm',
+    'leftWrist', 'rightWrist',
+    
+    // Torso and spine (detailed)
+    'torso', 'spine', 'pelvis', 'hips',
+    'chest', 'upperBack', 'lowerBack',
+    
+    // Legs (detailed)
+    'leftHip', 'rightHip',
+    'leftUpperLeg', 'rightUpperLeg',
+    'leftKnee', 'rightKnee',
+    'leftLowerLeg', 'rightLowerLeg',
+    'leftAnkle', 'rightAnkle',
+    'leftFoot', 'rightFoot',
+    'leftHeel', 'rightHeel',
+    'leftFootIndex', 'rightFootIndex',
+    
+    // Additional joints for better stability
+    'leftLowerArm', 'rightLowerArm',
+    'sternum', // chest center
+    'leftPinky', 'rightPinky',
+    'leftIndex', 'rightIndex',
+    'leftThumb', 'rightThumb',
+  ]
   // Joints (spheres)
   jointNames.forEach(name => {
     const s = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat.clone());
@@ -96,14 +128,77 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
   // mapping by approximate pose indices (MediaPipe Pose uses 33 landmarks)
   // Extended mapping for more joints (MediaPipe Pose uses 33 landmarks)
   const map = {
-    nose: 0, leftShoulder:11, rightShoulder:12, leftElbow:13, rightElbow:14, leftWrist:15, rightWrist:16,
-    leftHip:23, rightHip:24, leftKnee:25, rightKnee:26, leftAnkle:27, rightAnkle:28,
-    leftFoot:31, rightFoot:32, pelvis: 23, // pelvis = leftHip for now
-    leftUpperArm:11, rightUpperArm:12, leftLowerArm:13, rightLowerArm:14,
-    leftUpperLeg:23, rightUpperLeg:24, leftLowerLeg:25, rightLowerLeg:26
+    // Head (0-10) - detailed facial landmarks
+    nose: 0, 
+    head: 0,  // use same index as nose
+    neck: 1,  // ear region
+    leftEye: 2,
+    rightEye: 5,
+    leftEar: 7,
+    rightEar: 8,
+    leftEyeInner: 1,
+    rightEyeInner: 4,
+    leftEyeOuter: 3,
+    rightEyeOuter: 6,
+    mouthLeft: 9,
+    mouthRight: 10,
+    
+    // Shoulders and arms (11-16)
+    leftShoulder: 11, 
+    rightShoulder: 12,
+    leftElbow: 13, 
+    rightElbow: 14,
+    leftWrist: 15, 
+    rightWrist: 16,
+    leftUpperArm: 11, 
+    rightUpperArm: 12,
+    leftLowerArm: 13, 
+    rightLowerArm: 14,
+    leftForearm: 13,
+    rightForearm: 14,
+    
+    // Torso and hips (11-24) - detailed spine
+    torso: 23,
+    spine: 23,
+    pelvis: 23,
+    hips: 24,
+    sternum: 11,  // use shoulder midpoint approximation
+    chest: 11,
+    upperBack: 12,
+    lowerBack: 23,
+    
+    // Hands (15-22) - finger tips
+    leftPinky: 17,
+    rightPinky: 18,
+    leftIndex: 19,
+    rightIndex: 20,
+    leftThumb: 21,
+    rightThumb: 22,
+    
+    // Legs (23-32) - detailed leg tracking
+    leftHip: 23, 
+    rightHip: 24,
+    leftKnee: 25, 
+    rightKnee: 26,
+    leftAnkle: 27, 
+    rightAnkle: 28,
+    leftUpperLeg: 23, 
+    rightUpperLeg: 24,
+    leftLowerLeg: 25, 
+    rightLowerLeg: 26,
+    leftHeel: 29,
+    rightHeel: 30,
+    leftFoot: 31, 
+    rightFoot: 32,
+    leftFootIndex: 31,
+    rightFootIndex: 32
   };
   // Per-limb smoothing and stability
-  const legKeys = ['leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle','leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg','leftFoot','rightFoot'];
+  const legKeys = [
+    'leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle',
+    'leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg',
+    'leftFoot','rightFoot','leftHeel','rightHeel','leftFootIndex','rightFootIndex'
+  ];
   const maxLegMove = 0.18; // meters, max allowed jump per frame (tighter for stability)
   // Update joints
   for (const key in map) {

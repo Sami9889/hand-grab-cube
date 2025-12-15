@@ -1,3 +1,4 @@
+import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 import { createRenderer, startLoop } from './src/renderer.js';
 import { clampVelocity, clampPosition, syncKinematic } from './src/physics-stabilizer.js';
 import { getSupportLeg, getSupportFootPosition } from './src/physics-support-leg.js';
@@ -8,6 +9,26 @@ import { createVRControls } from './src/vr.js';
 import { createUI } from './src/ui.js';
 import { createHUD } from './src/hud.js';
 import { fuseAverages } from './src/multiview.js';
+
+// Enhanced error reporting for debugging
+window.addEventListener('error', (event) => {
+  console.error('Global Error:', event.message, event.filename, event.lineno, event.colno, event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled Promise Rejection:', event.reason);
+});
+
+// Also log all THREE.Vector3 and constructor calls
+const originalError = console.error;
+console.error = function(...args) {
+  originalError.apply(console, ['[ERROR]', ...args]);
+};
+
+const originalWarn = console.warn;
+console.warn = function(...args) {
+  originalWarn.apply(console, ['[WARN]', ...args]);
+};
 
 (async function(){
       // ragdoll toggle UI
