@@ -303,9 +303,9 @@ console.warn = function(...args) {
       const lm = ev.data && ev.data.landmarks ? ev.data.landmarks : ev.data;
       smoothedFace = smoothLandmarks(smoothedFace, lm, smoothing);
       if (showFace) draw2DFace(overlayCtx, smoothedFace);
-      // Update avatar face mesh with actual scan data (pass avatar to hide old head)
+      // Update avatar face mesh with actual scan data
       if (avatar && avatar.faceMesh && smoothedFace && smoothedFace.length > 0) {
-        updateFaceMeshFromScan(avatar.faceMesh, smoothedFace, avatar);
+        updateFaceMeshFromScan(avatar.faceMesh, smoothedFace);
       }
       return;
     }
