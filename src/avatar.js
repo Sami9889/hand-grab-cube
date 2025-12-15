@@ -64,12 +64,23 @@ export function createAvatar(scene) {
   torso.visible = false; group.add(torso); joints.torso = { mesh: torso, pos: new THREE.Vector3() };
   // Limbs (cylinders between joints, more anatomical detail)
   const limbPairs = [
-    ['leftShoulder','leftUpperArm'], ['leftUpperArm','leftElbow'], ['leftElbow','leftLowerArm'], ['leftLowerArm','leftWrist'],
-    ['rightShoulder','rightUpperArm'], ['rightUpperArm','rightElbow'], ['rightElbow','rightLowerArm'], ['rightLowerArm','rightWrist'],
-    ['leftHip','leftUpperLeg'], ['leftUpperLeg','leftKnee'], ['leftKnee','leftLowerLeg'], ['leftLowerLeg','leftAnkle'], ['leftAnkle','leftFoot'],
-    ['rightHip','rightUpperLeg'], ['rightUpperLeg','rightKnee'], ['rightKnee','rightLowerLeg'], ['rightLowerLeg','rightAnkle'], ['rightAnkle','rightFoot'],
-    ['leftShoulder','rightShoulder'], ['leftHip','rightHip'], ['pelvis','leftHip'], ['pelvis','rightHip'], ['pelvis','torso'],
-    ['torso','leftShoulder'], ['torso','rightShoulder']
+    // Arms - detailed connections
+    ['leftShoulder','leftUpperArm'], ['leftUpperArm','leftElbow'], ['leftElbow','leftForearm'], ['leftForearm','leftWrist'],
+    ['rightShoulder','rightUpperArm'], ['rightUpperArm','rightElbow'], ['rightElbow','rightForearm'], ['rightForearm','rightWrist'],
+    
+    // Legs - detailed connections with heel and foot
+    ['leftHip','leftUpperLeg'], ['leftUpperLeg','leftKnee'], ['leftKnee','leftLowerLeg'], ['leftLowerLeg','leftAnkle'], 
+    ['leftAnkle','leftHeel'], ['leftHeel','leftFoot'], ['leftAnkle','leftFootIndex'],
+    ['rightHip','rightUpperLeg'], ['rightUpperLeg','rightKnee'], ['rightKnee','rightLowerLeg'], ['rightLowerLeg','rightAnkle'], 
+    ['rightAnkle','rightHeel'], ['rightHeel','rightFoot'], ['rightAnkle','rightFootIndex'],
+    
+    // Torso and spine - detailed connections
+    ['leftShoulder','rightShoulder'], ['leftHip','rightHip'], ['pelvis','leftHip'], ['pelvis','rightHip'], 
+    ['pelvis','spine'], ['spine','torso'], ['torso','chest'], ['chest','sternum'],
+    ['torso','leftShoulder'], ['torso','rightShoulder'], ['neck','leftShoulder'], ['neck','rightShoulder'],
+    
+    // Head connections
+    ['neck','nose'], ['nose','leftEye'], ['nose','rightEye'], ['leftEye','leftEar'], ['rightEye','rightEar']
   ];
   const limbs = limbPairs.map(([a,b]) => {
     const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1,16), mat.clone());
@@ -85,45 +96,90 @@ export function createAvatar(scene) {
 }
 
 export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
-  if (!landmarks || landmarks.length === 0) {
-    avatar.group.visible = false;
-    // Hide all parts
-    Object.values(avatar.joints).forEach(j => j.mesh.visible = false);
-    if (avatar.limbs) avatar.limbs.forEach(l => l.mesh.visible = false);
-    if (avatar.fingers) {
-      Object.values(avatar.fingers).forEach(arr => arr.forEach(f => f.mesh.visible = false));
-    }
-    avatar.headDir.visible = false;
+  // Null safety checks
+  if (!avatar || !avatar.joints || !avatar.group) {
+    console.error('[ERROR] Invalid avatar object passed to updateAvatarFromPose');
     return;
   }
-  avatar.group.visible = true;
-  // Show all parts by default (will be positioned below)
-  Object.values(avatar.joints).forEach(j => j.mesh.visible = true);
-  if (avatar.limbs) avatar.limbs.forEach(l => l.mesh.visible = true);
-  if (avatar.fingers) {
-    Object.values(avatar.fingers).forEach(arr => arr.forEach(f => f.mesh.visible = true));
+  
+  if (!landmarks || landmarks.length === 0) {
+    avatar.group.visible = false;
+    // Hide all parts with null checks
+    try {
+      Object.values(avatar.joints).forEach(j => {
+        if (j && j.mesh) j.mesh.visible = false;
+      });
+      if (avatar.limbs) avatar.limbs.forEach(l => {
+        if (l && l.mesh) l.mesh.visible = false;
+      });
+      if (avatar.fingers) {
+        Object.values(avatar.fingers).forEach(arr => {
+          if (arr) arr.forEach(f => {
+            if (f && f.mesh) f.mesh.visible = false;
+          });
+        });
+      }
+      if (avatar.headDir) avatar.headDir.visible = false;
+    } catch (e) {
+      console.error('[ERROR] Error hiding avatar parts:', e);
+    }
+    return;
   }
+  
+  avatar.group.visible = true;
+  // Show all parts by default (will be positioned below) with null checks
+  try {
+    Object.values(avatar.joints).forEach(j => {
+      if (j && j.mesh) j.mesh.visible = true;
+    });
+    if (avatar.limbs) avatar.limbs.forEach(l => {
+      if (l && l.mesh) l.mesh.visible = true;
+    });
+    if (avatar.fingers) {
+      Object.values(avatar.fingers).forEach(arr => {
+        if (arr) arr.forEach(f => {
+          if (f && f.mesh) f.mesh.visible = true;
+        });
+      });
+    }
+  } catch (e) {
+    console.error('[ERROR] Error showing avatar parts:', e);
+  }
+  
   // Hand and finger tips (if hand landmarks are available on window._lastHands)
   if (window._lastHands && Array.isArray(window._lastHands)) {
-    ['left','right'].forEach((side, sidx) => {
-      const hand = window._lastHands.find(h => h.handedness && h.handedness.toLowerCase() === side);
-      if (hand && hand.landmarks && avatar.fingers && avatar.fingers[side]) {
-        for (let i = 0; i < avatar.fingers[side].length; i++) {
-          const tip = avatar.fingers[side][i];
-          const lm = hand.landmarks[tip.idx];
-          if (lm) {
-            const w = handToWorld(lm.x, lm.y, lm.z, 1.6);
-            tip.pos.lerp(w, 0.7);
-            tip.mesh.position.copy(tip.pos);
-            tip.mesh.visible = true;
-          } else {
-            tip.mesh.visible = false;
+    try {
+      ['left','right'].forEach((side, sidx) => {
+        const hand = window._lastHands.find(h => h && h.handedness && h.handedness.toLowerCase() === side);
+        if (hand && hand.landmarks && avatar.fingers && avatar.fingers[side]) {
+          for (let i = 0; i < avatar.fingers[side].length; i++) {
+            const tip = avatar.fingers[side][i];
+            if (!tip || !tip.mesh) continue;
+            const lm = hand.landmarks[tip.idx];
+            if (lm && lm.x !== undefined && lm.y !== undefined && lm.z !== undefined) {
+              try {
+                const w = handToWorld(lm.x, lm.y, lm.z, 1.6);
+                if (w && tip.pos) {
+                  tip.pos.lerp(w, 0.7);
+                  tip.mesh.position.copy(tip.pos);
+                  tip.mesh.visible = true;
+                }
+              } catch (e) {
+                tip.mesh.visible = false;
+              }
+            } else {
+              tip.mesh.visible = false;
+            }
           }
+        } else if (avatar.fingers && avatar.fingers[side]) {
+          avatar.fingers[side].forEach(tip => {
+            if (tip && tip.mesh) tip.mesh.visible = false;
+          });
         }
-      } else if (avatar.fingers && avatar.fingers[side]) {
-        avatar.fingers[side].forEach(tip => tip.mesh.visible = false);
-      }
-    });
+      });
+    } catch (e) {
+      console.error('[ERROR] Error updating finger tips:', e);
+    }
   }
   // mapping by approximate pose indices (MediaPipe Pose uses 33 landmarks)
   // Extended mapping for more joints (MediaPipe Pose uses 33 landmarks)
@@ -200,20 +256,36 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     'leftFoot','rightFoot','leftHeel','rightHeel','leftFootIndex','rightFootIndex'
   ];
   const maxLegMove = 0.18; // meters, max allowed jump per frame (tighter for stability)
-  // Update joints
-  for (const key in map) {
-    const idx = map[key]; const p = landmarks[idx]; const part = avatar.joints[key];
-    if (!p || !part) continue;
-    const w = handToWorld(p.x, p.y, p.z, 1.6);
-    let smooth = avatar.smoothFactor;
-    if (legKeys.includes(key)) smooth = Math.max(0.7, avatar.smoothFactor);
-    if (legKeys.includes(key)) {
-      const dist = part.pos.distanceTo(w);
-      if (dist > maxLegMove) continue;
+  // Update joints with extensive null checks
+  try {
+    for (const key in map) {
+      const idx = map[key];
+      if (idx === undefined || idx === null) continue;
+      const p = landmarks[idx];
+      const part = avatar.joints[key];
+      if (!p || !part || !part.pos || !part.mesh) continue;
+      if (p.x === undefined || p.y === undefined || p.z === undefined) continue;
+      
+      try {
+        const w = handToWorld(p.x, p.y, p.z, 1.6);
+        if (!w || w.x === undefined || w.y === undefined || w.z === undefined) continue;
+        
+        let smooth = avatar.smoothFactor || 0.5;
+        if (legKeys.includes(key)) smooth = Math.max(0.7, avatar.smoothFactor || 0.5);
+        if (legKeys.includes(key)) {
+          const dist = part.pos.distanceTo(w);
+          if (dist > maxLegMove) continue;
+        }
+        part.pos.lerp(w, smooth);
+        part.mesh.position.copy(part.pos);
+        part.mesh.visible = true;
+      } catch (e) {
+        // Silently skip this joint if there's an error
+        continue;
+      }
     }
-    part.pos.lerp(w, smooth);
-    part.mesh.position.copy(part.pos);
-    part.mesh.visible = true;
+  } catch (e) {
+    console.error('[ERROR] Error updating joints:', e);
   }
   // Head (use nose position, offset upward)
   const nose = landmarks[0];
