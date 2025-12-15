@@ -101,9 +101,6 @@ export function createAvatar(scene) {
     cyl.visible = false; group.add(cyl);
     return { mesh: cyl, a, b };
   });
-  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
-  faceMesh.visible = false;
-  group.add(faceMesh);
   // head orientation arrow
   const headDir = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), 0.25, 0x88ff88);
   headDir.visible = false; group.add(headDir);
