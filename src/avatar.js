@@ -338,16 +338,4 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
       console.error('[ERROR] Error updating limbs:', e);
     }
   }
-  // update head orientation: use nose and shoulder mid point
-  if (nose && ls && rs) {
-    const mid = new THREE.Vector3((ls.x+rs.x)/2, (ls.y+rs.y)/2, (ls.z+rs.z)/2);
-    const noseW = handToWorld(nose.x, nose.y, nose.z, 1.6);
-    const midW = handToWorld(mid.x, mid.y, mid.z, 1.6);
-    const fwd = new THREE.Vector3().subVectors(noseW, midW).normalize();
-    avatar.headDir.position.copy(noseW);
-    avatar.headDir.setDirection(fwd);
-    avatar.headDir.visible = true;
-  } else {
-    avatar.headDir.visible = false;
-  }
 }
