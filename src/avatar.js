@@ -311,6 +311,7 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     avatar.joints.head.mesh.position.copy(avatar.joints.head.pos);
     avatar.joints.head.mesh.visible = true;
   }
+  // Head removed - using scanned face mesh instead
   // Torso (midpoint between shoulders and hips)
   const ls = landmarks[11], rs = landmarks[12], lh = landmarks[23], rh = landmarks[24];
   if (ls && rs && lh && rh && avatar.joints.torso) {
