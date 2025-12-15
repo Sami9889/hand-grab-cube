@@ -51,15 +51,13 @@ export function createAvatar(scene) {
     const s = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat.clone());
     s.visible = false; group.add(s); joints[name] = { mesh: s, pos: new THREE.Vector3() };
   });
-  // Hand and finger tips (spheres)
-  const handJoints = ['leftWrist','rightWrist'];
-  const fingerTipIndices = [4, 8, 12, 16, 20]; // thumb, index, middle, ring, pinky tips
-  const fingers = { left: [], right: [] };
-  handJoints.forEach(hand => {
-    for (let i = 0; i < fingerTipIndices.length; i++) {
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), mat.clone());
-      f.visible = false; group.add(f); fingers[hand.startsWith('left') ? 'left' : 'right'].push({ mesh: f, pos: new THREE.Vector3(), idx: fingerTipIndices[i] });
-    }
+  const bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  bodyMesh.visible = false;
+  group.add(bodyMesh);
+  
+  // Create joint references but no geometric shapes - scan will create the geometry
+  jointNames.forEach(name => {
+    joints[name] = { pos: new THREE.Vector3(), scanIndex: null };
   });
   // Head - will be replaced with actual face mesh from scan data
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
@@ -103,6 +101,9 @@ export function createAvatar(scene) {
     cyl.visible = false; group.add(cyl);
     return { mesh: cyl, a, b };
   });
+  const faceMesh = new THREE.Mesh(faceGeometry, faceMaterial);
+  faceMesh.visible = false;
+  group.add(faceMesh);
   // head orientation arrow
   const headDir = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), 0.25, 0x88ff88);
   headDir.visible = false; group.add(headDir);
@@ -357,18 +358,25 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     } catch (e) {
       console.error('[ERROR] Error updating limbs:', e);
     }
-  }
-  // update head orientation: use nose and shoulder mid point
-  if (nose && ls && rs) {
-    const mid = new THREE.Vector3((ls.x+rs.x)/2, (ls.y+rs.y)/2, (ls.z+rs.z)/2);
-    const noseW = handToWorld(nose.x, nose.y, nose.z, 1.6);
-    const midW = handToWorld(mid.x, mid.y, mid.z, 1.6);
-    const dir = new THREE.Vector3().subVectors(noseW, midW).normalize();
-    avatar.headDir.position.copy(noseW);
-    avatar.headDir.setDirection(dir);
-    avatar.headDir.visible = true;
-  } else {
-    avatar.headDir.visible = false;
+    
+    // Create triangulated mesh from landmarks
+    const indices = [];
+    // Connect nearby points to form triangles
+    for (let i = 0; i < faceLandmarks.length - 2; i++) {
+      if (i % 3 === 0) {
+        indices.push(i, i + 1, i + 2);
+      }
+    }
+    
+    faceMeshObj.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    faceMeshObj.geometry.setIndex(indices);
+    faceMeshObj.geometry.computeVertexNormals();
+    faceMeshObj.geometry.attributes.position.needsUpdate = true;
+    faceMeshObj.visible = true;
+    
+  } catch (e) {
+    console.error('[ERROR] Failed to update face mesh from scan:', e);
+    faceMeshObj.visible = false;
   }
 }
 
