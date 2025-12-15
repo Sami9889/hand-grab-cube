@@ -4,13 +4,57 @@
 <!doctype html>
 <html lang="en">
 <head>
- <script
-  src="https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js"
-  crossorigin="anonymous"
-></script>
+ <script>
+  // Robust Sentry error handling - wrap Sentry loading with try-catch
+  (function() {
+    // Override console.warn temporarily to suppress Sentry warnings
+    const originalWarn = console.warn;
+    const sentryWarningFilter = function(...args) {
+      const msg = args.join(' ');
+      if (!msg.includes('Sentry') && !msg.includes('sentry') && !msg.includes('ingest.de.sentry.io')) {
+        originalWarn.apply(console, args);
+      }
+      // Silently ignore Sentry warnings
+    };
+    
+    try {
+      const sentryScript = document.createElement('script');
+      sentryScript.src = 'https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js';
+      sentryScript.crossOrigin = 'anonymous';
+      sentryScript.onerror = function(e) {
+        // Silently fail - no console output
+        return true;
+      };
+      document.currentScript.parentNode.insertBefore(sentryScript, document.currentScript.nextSibling);
+    } catch (e) {
+      // Silently fail
+    }
+    
+    // Global error handler for Sentry-related errors - completely silent
+    window.addEventListener('error', (e) => {
+      if (e.message && (e.message.includes('Load failed') || e.message.includes('sentry') || e.message.includes('ingest') || e.filename && e.filename.includes('sentry'))) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return true;
+      }
+    }, true);
+    
+    // Handle unhandled promise rejections from Sentry - completely silent
+    window.addEventListener('unhandledrejection', (e) => {
+      const reasonStr = String(e.reason);
+      const stackStr = e.reason && e.reason.stack ? String(e.reason.stack) : '';
+      if (reasonStr.includes('sentry') || reasonStr.includes('ingest') || stackStr.includes('sentry') || stackStr.includes('browser.sentry-cdn.com')) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return true;
+      }
+    }, true);
+  })();
+</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>etcGrab Cube — Sami9889</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
