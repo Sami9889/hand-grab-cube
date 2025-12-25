@@ -78,7 +78,7 @@ console.warn = function(...args) {
       }
     }
 
-  const { scene, camera, renderer, helpers, stats } = await createRenderer();
+  const { scene, camera, renderer, helpers, stats, cameraState, setCameraMode, updateCamera } = await createRenderer({ enableVR: true, cameraMode: 'orbit' });
   document.body.appendChild(renderer.domElement);
   // status element
   const statusEl = document.getElementById('status');
@@ -262,32 +262,43 @@ console.warn = function(...args) {
     // listen for camera status
     if (ev.type === 'camera-ready') { hudStatus = 'camera ' + (ev.data.index || 0) + ' ready'; hud.set('Status', hudStatus); return; }
     if (ev.type === 'camera-error') { hudStatus = 'ERROR: ' + (ev.data.error || 'unknown'); hud.set('Status', hudStatus); return; }
-    // normalize incoming event payloads: tracking.js emits objects with `.landmarks` for pose/face,
-    // and an array of { landmarks, handedness, gesture } for hands.
+    
+    // Consume standardized tracking data format: { type, timestamp, normalized, world, metadata, gestures }
     if (ev.type === 'hands') {
-      latestHandsRaw = Array.isArray(ev.data) ? ev.data : [];
-      const first = latestHandsRaw.length>0 ? latestHandsRaw[0] : null;
-      const lmArray = first ? first.landmarks : null;
+      // New format: ev.data = { type, timestamp, count, hands: [{normalized, world, metadata, gestures}] }
+      const handsData = ev.data.hands || [];
+      latestHandsRaw = handsData; // store for potential VR/3D game use
+      
+      const first = handsData.length > 0 ? handsData[0] : null;
+      const lmArray = first ? first.normalized : null;
       smoothedHands = smoothLandmarks(smoothedHands, lmArray, smoothing);
+      
       if (showHands) {
         // prepare merged objects for drawing: use smoothed landmarks but keep gesture flags
-        const drawArray = latestHandsRaw.map((h, idx)=>({ landmarks: smoothedHands && idx===0 ? smoothedHands : h.landmarks, gesture: h.gesture }));
+        const drawArray = handsData.map((h, idx)=>({ 
+          landmarks: smoothedHands && idx===0 ? smoothedHands : h.normalized, 
+          gesture: h.gestures 
+        }));
         draw2DHands(overlayCtx, drawArray);
       }
       return;
     }
+    
     if (ev.type === 'pose') {
-      // event may include cameraIndex when from a dedicated pose instance
-      const camIdx = (ev.data && ev.data.cameraIndex !== undefined) ? ev.data.cameraIndex : 0;
-      const lm = (ev.data && ev.data.landmarks) ? ev.data.landmarks : (Array.isArray(ev.data) ? ev.data : []);
-      const world = (ev.data && ev.data.worldLandmarks) ? ev.data.worldLandmarks : null;
+      // New format: ev.data = { type, timestamp, normalized, world, metadata }
+      const camIdx = (ev.data.metadata && ev.data.metadata.cameraIndex !== undefined) ? ev.data.metadata.cameraIndex : 0;
+      const lm = ev.data.normalized || [];
+      const world = ev.data.world || null;
+      
       // smooth per-camera normalized and world landmarks
       const sm = smoothLandmarks(null, lm, smoothing);
       const smWorld = world ? smoothLandmarks(null, world, Math.min(0.6, smoothing)) : null;
       latestPosePerCamera[camIdx] = { landmarks: sm, world: smWorld };
+      
       // draw overlay from first available camera's normalized landmarks
       const first = latestPosePerCamera.find(p=>p && p.landmarks);
       if (first && first.landmarks) draw2DPose(overlayCtx, first.landmarks);
+      
       // fuse world landmarks if at least one camera provides them
       const available = latestPosePerCamera.filter(p=>p && p.world);
       if (available.length>0) {
@@ -299,8 +310,10 @@ console.warn = function(...args) {
       }
       return;
     }
+    
     if (ev.type === 'face') {
-      const lm = ev.data && ev.data.landmarks ? ev.data.landmarks : ev.data;
+      // New format: ev.data = { type, timestamp, normalized, world, metadata, annotations }
+      const lm = ev.data.normalized || [];
       smoothedFace = smoothLandmarks(smoothedFace, lm, smoothing);
       if (showFace) draw2DFace(overlayCtx, smoothedFace);
       return;
@@ -348,6 +361,20 @@ console.warn = function(...args) {
     // draw some dots for landmark clarity
     for(let i=0;i<face.length;i+=6){ const p=face[i]; if(!p) continue; ctx.beginPath(); ctx.arc(p.x*overlay.width,p.y*overlay.height,1.2,0,Math.PI*2); ctx.fill(); }
   }
+
+  // Camera mode toggle UI
+  const cameraModeSelect = document.createElement('select');
+  cameraModeSelect.id = 'cameraModeSelect';
+  cameraModeSelect.innerHTML = '<option value="orbit">Orbit (3D Game)</option><option value="firstPerson">First Person (3D Game)</option><option value="free">Free (Manual)</option><option value="vr">VR Mode</option>';
+  cameraModeSelect.style.cssText = 'position:absolute; top:120px; left:10px; z-index:1000; padding:8px; background:#222; color:#fff; border:1px solid #555;';
+  document.body.appendChild(cameraModeSelect);
+  cameraModeSelect.addEventListener('change', (e) => {
+    setCameraMode(e.target.value);
+    if (e.target.value === 'vr') {
+      // In VR mode, disable keyboard controls to avoid conflicts
+      alert('VR mode active. Use VR controllers or switch to another mode for keyboard/mouse controls.');
+    }
+  });
 
   // render loop updates avatar from latest pose
   startLoop(renderer, scene, camera, (dt)=>{
@@ -407,6 +434,6 @@ console.warn = function(...args) {
         }
       }
     }
-  });
+  }, { updateCamera }); // pass camera update function to render loop
 
 })();
