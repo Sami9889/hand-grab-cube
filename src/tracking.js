@@ -29,50 +29,113 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
 
   hands.onResults((r)=>{
     if (active!=='hands') return;
-    // emit hands plus a simple pinch gesture detection (thumb tip 4 vs index tip 8)
-    const handsOut = [];
+    // Standardized format: { type, timestamp, normalized, world, metadata, gestures }
     const lm = r.multiHandLandmarks || [];
     const hh = r.multiHandedness || [];
+    const wl = r.multiHandWorldLandmarks || [];
+    
     // maintain last pinch state per hand index
     if (!hands.__lastPinch) hands.__lastPinch = [];
+    
+    const handsOut = [];
     for (let i=0;i<lm.length;i++){
-      const l = lm[i];
-      const handedness = (hh[i] && hh[i].label) || null;
-      const score = (hh[i] && hh[i].score) || null;
-      let gesture = { pinch: false, pinchStrength: 0 };
+      const normalized = lm[i]; // array of {x,y,z} in screen space [0-1]
+      const world = wl[i] || null; // array of {x,y,z} in meters (if available)
+      const handedness = (hh[i] && hh[i].label) || 'Unknown';
+      const confidence = (hh[i] && hh[i].score) || 0;
+      
+      // Compute gestures
+      let gestures = { pinch: false, pinchStrength: 0, grab: false, point: false };
       try {
-        const t4 = l[4]; const t8 = l[8];
+        const t4 = normalized[4]; const t8 = normalized[8];
         if (t4 && t8) {
-          // compute euclidean distance in normalized coords
+          // Pinch detection (thumb tip vs index tip)
           const dx = t4.x - t8.x; const dy = t4.y - t8.y; const dz = (t4.z||0) - (t8.z||0);
           const d = Math.sqrt(dx*dx+dy*dy+dz*dz);
-          // estimate scale by distance between wrist(0) and middle-finger-mcp(9)
-          const sBase = (l[0] && l[9]) ? Math.hypot(l[0].x-l[9].x, l[0].y-l[9].y) : 0.1;
+          const sBase = (normalized[0] && normalized[9]) ? Math.hypot(normalized[0].x-normalized[9].x, normalized[0].y-normalized[9].y) : 0.1;
           const strength = Math.max(0, Math.min(1, 1 - (d / (sBase * 1.6))));
-          gesture.pinchStrength = strength;
-          gesture.pinch = strength > 0.45;
+          gestures.pinchStrength = strength;
+          gestures.pinch = strength > 0.45;
         }
+        
+        // Point gesture (index extended, others curled)
+        const fingerTips = [normalized[8], normalized[12], normalized[16], normalized[20]]; // index, middle, ring, pinky tips
+        const fingerMCPs = [normalized[5], normalized[9], normalized[13], normalized[17]];
+        if (fingerTips[0] && fingerMCPs[0]) {
+          const indexExtended = (fingerTips[0].y < fingerMCPs[0].y);
+          const othersRetracted = fingerTips.slice(1).every((tip, idx) => !tip || !fingerMCPs[idx+1] || tip.y > fingerMCPs[idx+1].y);
+          gestures.point = indexExtended && othersRetracted;
+        }
+        
+        // Grab gesture (all fingers curled)
+        const allCurled = fingerTips.every((tip, idx) => !tip || !fingerMCPs[idx] || tip.y > fingerMCPs[idx].y);
+        gestures.grab = allCurled && !gestures.pinch;
       } catch(e){}
+      
       const prev = !!hands.__lastPinch[i];
-      hands.__lastPinch[i] = gesture.pinch;
-      // also emit high-level CustomEvent for quick listeners
-      if (gesture.pinch && !prev) window.dispatchEvent(new CustomEvent('hand-gesture', { detail: { type: 'pinchstart', index: i, handedness, strength: gesture.pinchStrength } }));
-      if (!gesture.pinch && prev) window.dispatchEvent(new CustomEvent('hand-gesture', { detail: { type: 'pinchend', index: i, handedness, strength: gesture.pinchStrength } }));
-      handsOut.push({ landmarks: l, handedness, score, gesture });
+      hands.__lastPinch[i] = gestures.pinch;
+      
+      // Emit discrete gesture events for easy listening
+      if (gestures.pinch && !prev) window.dispatchEvent(new CustomEvent('hand-gesture', { detail: { type: 'pinchstart', index: i, handedness, strength: gestures.pinchStrength } }));
+      if (!gestures.pinch && prev) window.dispatchEvent(new CustomEvent('hand-gesture', { detail: { type: 'pinchend', index: i, handedness, strength: gestures.pinchStrength } }));
+      
+      handsOut.push({
+        normalized,    // screen-space landmarks [0-1]
+        world,         // metric-space landmarks (meters) - null if unavailable
+        metadata: { handedness, confidence, index: i },
+        gestures
+      });
     }
-    emit('hands', handsOut);
+    
+    // Emit standardized tracking data
+    emit('hands', {
+      type: 'hands',
+      timestamp: performance.now(),
+      count: handsOut.length,
+      hands: handsOut
+    });
   });
 
   pose.onResults((r)=>{
     if (active!=='pose') return;
-    // poseLandmarks include .visibility for many points
-    emit('pose', { landmarks: r.poseLandmarks || [], worldLandmarks: r.poseWorldLandmarks || null });
+    // Standardized format for pose
+    const normalized = r.poseLandmarks || []; // screen-space [0-1] with .visibility
+    const world = r.poseWorldLandmarks || null; // metric-space (meters)
+    
+    // Extract metadata (average visibility/confidence)
+    const avgVisibility = normalized.length > 0 
+      ? normalized.reduce((sum, pt) => sum + (pt.visibility || 0), 0) / normalized.length 
+      : 0;
+    
+    emit('pose', {
+      type: 'pose',
+      timestamp: performance.now(),
+      normalized,     // array of {x, y, z, visibility}
+      world,          // array of {x, y, z, visibility} in meters
+      metadata: { 
+        landmarkCount: normalized.length, 
+        averageConfidence: avgVisibility 
+      }
+    });
   });
 
   faceMesh.onResults((r)=>{
     if (active!=='face') return;
-    const m = r.multiFaceLandmarks && r.multiFaceLandmarks[0];
-    emit('face', { landmarks: m ? m : [], annotations: r.faceLandmarks || null });
+    // Standardized format for face
+    const normalized = (r.multiFaceLandmarks && r.multiFaceLandmarks[0]) || [];
+    const annotations = r.faceLandmarks || null; // named feature groups if available
+    
+    emit('face', {
+      type: 'face',
+      timestamp: performance.now(),
+      normalized,     // array of {x, y, z} for 468 face landmarks
+      world: null,    // face mesh doesn't provide world coordinates
+      metadata: { 
+        landmarkCount: normalized.length,
+        hasAnnotations: !!annotations 
+      },
+      annotations     // optional: named groups like lips, leftEye, etc.
+    });
   });
 
   // startCamera supports an explicit deviceId via getUserMedia or falls back to MediaPipe Camera util
@@ -99,7 +162,24 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
       const camIdx = poseCams.length;
       const myPose = new PoseCls({ locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
       myPose.setOptions({ modelComplexity: perfMode?0:1, smoothLandmarks: true, minDetectionConfidence: perfMode?0.45:0.6 });
-      myPose.onResults((r)=>{ const data = { landmarks: r.poseLandmarks || [], worldLandmarks: r.poseWorldLandmarks || null }; emit('pose', { ...data, cameraIndex: camIdx }); });
+      myPose.onResults((r)=>{ 
+        const normalized = r.poseLandmarks || [];
+        const world = r.poseWorldLandmarks || null;
+        const avgVisibility = normalized.length > 0 
+          ? normalized.reduce((sum, pt) => sum + (pt.visibility || 0), 0) / normalized.length 
+          : 0;
+        emit('pose', {
+          type: 'pose',
+          timestamp: performance.now(),
+          normalized,
+          world,
+          metadata: { 
+            landmarkCount: normalized.length, 
+            averageConfidence: avgVisibility,
+            cameraIndex: camIdx 
+          }
+        }); 
+      });
       const camHandle = { stop: ()=>{ try{ console.log('[etcGrab] stopping cam',camIdx); if (raf) cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(t=>t.stop()); }catch(e){ console.error('stop err',e); } }, videoEl, pose: myPose };
       poseCams.push(camHandle);
       const start = async ()=>{
