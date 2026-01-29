@@ -46,19 +46,30 @@ export function createAvatar(scene) {
     'leftIndex', 'rightIndex',
     'leftThumb', 'rightThumb',
   ]
-  // Joints (spheres)
+  // Joints (spheres) - NOW VISIBLE BY DEFAULT
   jointNames.forEach(name => {
     const s = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), mat.clone());
-    s.visible = false; group.add(s); joints[name] = { mesh: s, pos: new THREE.Vector3() };
+    s.visible = true; // CHANGED: Make visible by default
+    s.castShadow = true;
+    group.add(s); 
+    joints[name] = { mesh: s, pos: new THREE.Vector3() };
   });
-  // Head
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
-  head.visible = false; group.add(head); joints.head = { mesh: head, pos: new THREE.Vector3() };
   
-  // Torso (box)
+  // Head - NOW VISIBLE BY DEFAULT
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 18, 12), mat.clone());
+  head.visible = true; // CHANGED: Make visible by default
+  head.castShadow = true;
+  group.add(head); 
+  joints.head = { mesh: head, pos: new THREE.Vector3() };
+  
+  // Torso (box) - NOW VISIBLE BY DEFAULT
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.32, 0.12), mat.clone());
-  torso.visible = false; group.add(torso); joints.torso = { mesh: torso, pos: new THREE.Vector3() };
-  // Limbs (cylinders between joints, more anatomical detail)
+  torso.visible = true; // CHANGED: Make visible by default
+  torso.castShadow = true;
+  group.add(torso); 
+  joints.torso = { mesh: torso, pos: new THREE.Vector3() };
+  
+  // Limbs (cylinders between joints, more anatomical detail) - NOW VISIBLE BY DEFAULT
   const limbPairs = [
     // Arms - detailed connections
     ['leftShoulder','leftUpperArm'], ['leftUpperArm','leftElbow'], ['leftElbow','leftForearm'], ['leftForearm','leftWrist'],
@@ -80,13 +91,19 @@ export function createAvatar(scene) {
   ];
   const limbs = limbPairs.map(([a,b]) => {
     const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,1,16), mat.clone());
-    cyl.visible = false; group.add(cyl);
+    cyl.visible = true; // CHANGED: Make visible by default
+    cyl.castShadow = true;
+    group.add(cyl);
     return { mesh: cyl, a, b };
   });
-  // head orientation arrow
+  
+  // head orientation arrow - NOW VISIBLE BY DEFAULT
   const headDir = new THREE.ArrowHelper(new THREE.Vector3(0,0,-1), new THREE.Vector3(0,0,0), 0.25, 0x88ff88);
-  headDir.visible = false; group.add(headDir);
+  headDir.visible = true; // CHANGED: Make visible by default
+  group.add(headDir);
+  
   scene.add(group);
+  
   // increase smoothing for more stable movement
   return { group, joints, limbs, headDir, smoothFactor: 0.5 };
 }
@@ -99,48 +116,12 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
   }
   
   if (!landmarks || landmarks.length === 0) {
-    avatar.group.visible = false;
-    // Hide all parts with null checks
-    try {
-      Object.values(avatar.joints).forEach(j => {
-        if (j && j.mesh) j.mesh.visible = false;
-      });
-      if (avatar.limbs) avatar.limbs.forEach(l => {
-        if (l && l.mesh) l.mesh.visible = false;
-      });
-      if (avatar.fingers) {
-        Object.values(avatar.fingers).forEach(arr => {
-          if (arr) arr.forEach(f => {
-            if (f && f.mesh) f.mesh.visible = false;
-          });
-        });
-      }
-      if (avatar.headDir) avatar.headDir.visible = false;
-    } catch (e) {
-      console.error('[ERROR] Error hiding avatar parts:', e);
-    }
+    // Don't hide the avatar when no landmarks - just keep it at last position
+    // This prevents flickering when tracking is temporarily lost
     return;
   }
   
   avatar.group.visible = true;
-  // Show all parts by default (will be positioned below) with null checks
-  try {
-    Object.values(avatar.joints).forEach(j => {
-      if (j && j.mesh) j.mesh.visible = true;
-    });
-    if (avatar.limbs) avatar.limbs.forEach(l => {
-      if (l && l.mesh) l.mesh.visible = true;
-    });
-    if (avatar.fingers) {
-      Object.values(avatar.fingers).forEach(arr => {
-        if (arr) arr.forEach(f => {
-          if (f && f.mesh) f.mesh.visible = true;
-        });
-      });
-    }
-  } catch (e) {
-    console.error('[ERROR] Error showing avatar parts:', e);
-  }
   
   // Hand and finger tips (if hand landmarks are available on window._lastHands)
   if (window._lastHands && Array.isArray(window._lastHands)) {
@@ -161,23 +142,17 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
                   tip.mesh.visible = true;
                 }
               } catch (e) {
-                tip.mesh.visible = false;
+                // Keep last position instead of hiding
               }
-            } else {
-              tip.mesh.visible = false;
             }
           }
-        } else if (avatar.fingers && avatar.fingers[side]) {
-          avatar.fingers[side].forEach(tip => {
-            if (tip && tip.mesh) tip.mesh.visible = false;
-          });
         }
       });
     } catch (e) {
       console.error('[ERROR] Error updating finger tips:', e);
     }
   }
-  // mapping by approximate pose indices (MediaPipe Pose uses 33 landmarks)
+  
   // Extended mapping for more joints (MediaPipe Pose uses 33 landmarks)
   const map = {
     // Head (0-10) - detailed facial landmarks
@@ -245,6 +220,7 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     leftFootIndex: 31,
     rightFootIndex: 32
   };
+  
   // Per-limb smoothing and stability
   const legKeys = [
     'leftHip','rightHip','leftKnee','rightKnee','leftAnkle','rightAnkle',
@@ -252,6 +228,7 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     'leftFoot','rightFoot','leftHeel','rightHeel','leftFootIndex','rightFootIndex'
   ];
   const maxLegMove = 0.18; // meters, max allowed jump per frame (tighter for stability)
+  
   // Update joints with extensive null checks
   try {
     for (const key in map) {
@@ -276,13 +253,14 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
         part.mesh.position.copy(part.pos);
         part.mesh.visible = true;
       } catch (e) {
-        // Silently skip this joint if there's an error
+        // Keep last position instead of hiding
         continue;
       }
     }
   } catch (e) {
     console.error('[ERROR] Error updating joints:', e);
   }
+  
   // Head (use nose position, offset upward)
   const nose = landmarks[0];
   if (nose && avatar.joints.head) {
@@ -291,7 +269,7 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     avatar.joints.head.mesh.position.copy(avatar.joints.head.pos);
     avatar.joints.head.mesh.visible = true;
   }
-  // Head removed - using scanned face mesh instead
+  
   // Torso (midpoint between shoulders and hips)
   const ls = landmarks[11], rs = landmarks[12], lh = landmarks[23], rh = landmarks[24];
   if (ls && rs && lh && rh && avatar.joints.torso) {
@@ -303,6 +281,7 @@ export function updateAvatarFromPose(avatar, landmarks, handToWorld) {
     avatar.joints.torso.mesh.position.copy(avatar.joints.torso.pos);
     avatar.joints.torso.mesh.visible = true;
   }
+  
   // Limbs (cylinders between joints) - with extensive null checks
   if (avatar.limbs) {
     try {
