@@ -1,78 +1,88 @@
-  <button id="recordToggle">Start Recording</button>
-  <a id="recordDownload" style="display:none; margin-left:8px;">Download Recording</a>
-  <span id="recordStatus" style="margin-left:8px;color:#e33;"></span>
 <!doctype html>
 <html lang="en">
 <head>
- <script>
-  // Robust Sentry error handling - wrap Sentry loading with try-catch
-  (function() {
-    try {
-      const sentryScript = document.createElement('script');
-      sentryScript.src = 'https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js';
-      sentryScript.crossOrigin = 'anonymous';
-      sentryScript.onerror = function(e) {
-        console.warn('[WARN] Sentry CDN load failed, continuing without Sentry:', e);
-        // Prevent error from bubbling up
-        return true;
-      };
-      document.currentScript.parentNode.insertBefore(sentryScript, document.currentScript.nextSibling);
-    } catch (e) {
-      console.warn('[WARN] Failed to initialize Sentry:', e);
-    }
-    
-    // Global error handler for Sentry-related errors
-    window.addEventListener('error', (e) => {
-      if (e.message && (e.message.includes('Load failed') || e.message.includes('sentry') || e.message.includes('ingest.de.sentry.io'))) {
-        console.warn('[WARN] Sentry error caught and suppressed:', e.message);
-        e.preventDefault();
-        return true;
+  <script>
+    // Robust Sentry error handling - wrap Sentry loading with try-catch
+    (function() {
+      try {
+        const sentryScript = document.createElement('script');
+        sentryScript.src = 'https://js-de.sentry-cdn.com/2dc4aa71988d528bcb6b6af39861fa0c.min.js';
+        sentryScript.crossOrigin = 'anonymous';
+        sentryScript.onerror = function(e) {
+          console.warn('[WARN] Sentry CDN load failed, continuing without Sentry:', e);
+          return true;
+        };
+        document.currentScript.parentNode.insertBefore(sentryScript, document.currentScript.nextSibling);
+      } catch (e) {
+        console.warn('[WARN] Failed to initialize Sentry:', e);
       }
-    }, true);
-    
-    // Handle unhandled promise rejections from Sentry
-    window.addEventListener('unhandledrejection', (e) => {
-      if (e.reason && (String(e.reason).includes('sentry') || String(e.reason).includes('ingest.de.sentry.io'))) {
-        console.warn('[WARN] Sentry promise rejection caught and suppressed:', e.reason);
-        e.preventDefault();
-        return true;
-      }
-    }, true);
-  })();
-</script>
+      
+      // Global error handler for Sentry-related errors
+      window.addEventListener('error', (e) => {
+        if (e.message && (e.message.includes('Load failed') || e.message.includes('sentry') || e.message.includes('ingest.de.sentry.io'))) {
+          console.warn('[WARN] Sentry error caught and suppressed:', e.message);
+          e.preventDefault();
+          return true;
+        }
+      }, true);
+      
+      // Handle unhandled promise rejections from Sentry
+      window.addEventListener('unhandledrejection', (e) => {
+        if (e.reason && (String(e.reason).includes('sentry') || String(e.reason).includes('ingest.de.sentry.io'))) {
+          console.warn('[WARN] Sentry promise rejection caught and suppressed:', e.reason);
+          e.preventDefault();
+          return true;
+        }
+      }, true);
+    })();
+  </script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>etcGrab Cube — Sami9889</title>
+  <title>etcGrab Cube — Professional Body Tracking</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="ui">
     <h1>etcGrab Cube</h1>
-    <p id="instruction">etcGrab Cube — VR-ready full-body tracking & retargeting. Pinch to grab (thumb+index). Use WebXR to enter VR.</p>
+    <p id="instruction">Professional full-body tracking system. Allow camera access to begin tracking.</p>
     <div id="status">Status: initializing…</div>
 
-    <div class="controls" role="group" aria-label="Full body controls">
-      <label class="control-inline">Cameras: <select id="cameraSelect" multiple size="4" style="width:220px"></select></label>
-      <button id="cameraStartBtn">Start Selected Cameras</button>
-      <button id="cameraStopBtn">Stop All Cameras</button>
-      <button id="ragdollToggle">Toggle Ragdoll</button>
-      <label class="control-inline">Smoothing: <input id="smoothing" type="range" min="0" max="0.95" step="0.05" value="0.5"></label>
-      <label class="control-inline">HUD: <input id="hudToggle" type="checkbox" checked></label>
-      <button id="hapticsTest">Haptics Test</button>
+    <div class="controls" role="group" aria-label="Tracking controls">
+      <label class="control-inline">
+        Camera: 
+        <select id="cameraSelect" multiple size="3" style="width:220px"></select>
+      </label>
+      <button id="cameraStartBtn">Start Camera</button>
+      <button id="cameraStopBtn">Stop Camera</button>
+      
+      <label class="control-inline">
+        Smoothing: 
+        <input id="smoothing" type="range" min="0" max="0.95" step="0.05" value="0.5">
+      </label>
+      
+      <label class="control-inline">
+        HUD: 
+        <input id="hudToggle" type="checkbox" checked>
+      </label>
+      
+      <label class="control-inline">
+        Low Performance Mode: 
+        <input id="lowPerf" type="checkbox">
+      </label>
     </div>
+    
     <div id="eventLog" aria-live="polite" aria-atomic="true"></div>
   </div>
 
+  <!-- Hidden video element for camera feed -->
   <video id="video" autoplay playsinline style="display:none"></video>
-  <canvas id="handCanvas" style="position:absolute; left:0; top:0; z-index: 9; pointer-events: none;"></canvas>
 
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <!-- MediaPipe Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
+  <!-- Main Application -->
   <script type="module" src="main.js"></script>
 </body>
 </html>
