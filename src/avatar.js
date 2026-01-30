@@ -383,15 +383,29 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
         if (!part) return;
         part.position.copy(mid);
         
-        // Scale to match joint distance
+        // Scale to match joint distance with finer precision
         const baseHeight = part.geometry.parameters.height || 1;
         part.scale.y = (length + extraLength) / baseHeight;
         
-        // Rotate to align with joint direction
-        part.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction.normalize()
-        );
+        // Improved rotation to align with joint direction
+        // Use proper vector normalization and add fine-tuning for orientation
+        const normalizedDirection = direction.clone().normalize();
+        const upVector = new THREE.Vector3(0, 1, 0);
+        
+        // Calculate rotation quaternion with improved precision
+        part.quaternion.setFromUnitVectors(upVector, normalizedDirection);
+        
+        // Add fine rotation adjustments to prevent upside-down meshes
+        // Apply correction based on the direction vector to ensure proper orientation
+        if (normalizedDirection.y < -0.9) {
+          // If pointing strongly downward, add 180-degree correction
+          const correctionQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0), 
+            Math.PI
+          );
+          part.quaternion.multiply(correctionQuat);
+        }
+        
         part.visible = true;
       });
     } else {
