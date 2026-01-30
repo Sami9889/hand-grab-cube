@@ -102,6 +102,8 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
     const normalized = r.poseLandmarks || []; // screen-space [0-1] with .visibility
     const world = r.poseWorldLandmarks || null; // metric-space (meters)
     
+    console.log('[TRACKING] Pose results - normalized:', normalized.length, 'world:', world ? world.length : 'null');
+    
     // Extract metadata (average visibility/confidence)
     const avgVisibility = normalized.length > 0 
       ? normalized.reduce((sum, pt) => sum + (pt.visibility || 0), 0) / normalized.length 
