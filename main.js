@@ -119,11 +119,13 @@ window.addEventListener('unhandledrejection', (event) => {
         document.body.appendChild(v);
         
         try {
+          console.log('[MAIN] Starting camera with deviceId:', deviceId);
           const handle = await tracking.startCamera(v, { deviceId });
           activeCamHandles.push(handle);
           started++;
+          console.log('[MAIN] Camera started successfully');
         } catch (e) {
-          console.warn('Camera start failed:', e);
+          console.error('[MAIN] Camera start failed:', e);
         }
       }
       
@@ -133,6 +135,8 @@ window.addEventListener('unhandledrejection', (event) => {
           ? `Status: Tracking active (${started} camera${started > 1 ? 's' : ''})` 
           : 'Status: Failed to start cameras';
       }
+      
+      console.log('[MAIN] Started', started, 'camera(s)');
     });
   }
   

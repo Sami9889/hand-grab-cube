@@ -4,7 +4,7 @@ export async function createRenderer({ onResize, enableVR = true, cameraMode = '
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0d10);
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 100);
-  camera.position.set(0, 1.6, 2.6);
+  camera.position.set(0, 1.5, 4);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
