@@ -285,7 +285,10 @@ window.addEventListener('unhandledrejection', (event) => {
         }
         
         updateAvatarFromPose(avatar, latestPose.world, (x, y, z, scale) => {
-          return new THREE.Vector3(x, y + 1.6, -z);
+          // MediaPipe world coordinates: x=right, y=up, z=forward (toward camera)
+          // THREE.js: x=right, y=up, z=backward (away from camera)
+          // Flip Z to convert from camera-forward to camera-backward
+          return new THREE.Vector3(x, y, -z);
         });
       }
       // Fallback to screen landmarks (2D tracking)
@@ -316,8 +319,12 @@ window.addEventListener('unhandledrejection', (event) => {
         }
         
         updateAvatarFromPose(avatar, latestPose.landmarks, (x, y, z, scale) => {
+          // Convert MediaPipe 2D landmarks [0-1] to THREE.js world space
+          // x: 0-1 (left to right) -> THREE.js X
+          // y: 0-1 (top to bottom) -> THREE.js Y (inverted)
+          // z: relative depth -> THREE.js Z
           const ndcX = (x - 0.5) * 2;
-          const ndcY = -(y - 0.5) * 2;
+          const ndcY = -(y - 0.5) * 2;  // Flip Y axis
           const ndcZ = -0.3 - (z * 1.6);
           const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
           v.unproject(camera);
