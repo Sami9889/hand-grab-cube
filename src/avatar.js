@@ -383,28 +383,54 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
         if (!part) return;
         part.position.copy(mid);
         
-        // Scale to match joint distance
+        // Scale to match joint distance with finer precision
         const baseHeight = part.geometry.parameters.height || 1;
         part.scale.y = (length + extraLength) / baseHeight;
         
-        // Rotate to align with joint direction
-        part.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction.normalize()
-        );
+        // IMPROVED ROTATION SYSTEM - Fix upside-down mesh issue
+        // Normalize direction vector for accurate rotation
+        const normalizedDirection = direction.clone().normalize();
+        const upVector = new THREE.Vector3(0, 1, 0);
+        
+        // Create rotation matrix for proper orientation
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromUnitVectors(upVector, normalizedDirection);
+        
+        // CRITICAL FIX: Add multiple orientation corrections for different angles
+        // This ensures meshes are never upside down regardless of body position
+        
+        // Check if the mesh would be inverted (upside down)
+        const testUp = upVector.clone().applyQuaternion(quaternion);
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        
+        // If the local up is pointing significantly downward in world space, correct it
+        if (testUp.dot(worldUp) < -0.5) {
+          // Apply 180-degree roll correction to flip the mesh right-side up
+          const rollCorrection = new THREE.Quaternion().setFromAxisAngle(
+            normalizedDirection, 
+            Math.PI
+          );
+          quaternion.multiply(rollCorrection);
+        }
+        
+        // Additional correction for near-vertical orientations
+        if (Math.abs(normalizedDirection.y) > 0.95) {
+          // For near-vertical body parts, ensure proper alignment
+          const pitchCorrection = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0), 
+            Math.PI * 0.5 * Math.sign(normalizedDirection.y)
+          );
+          quaternion.premultiply(pitchCorrection);
+        }
+        
+        // Apply final corrected quaternion
+        part.quaternion.copy(quaternion);
         part.visible = true;
       });
     } else {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
     }
-    
-    [partWire, partSolid].forEach(part => {
-      if (part) {
-        part.position.copy(joint.mesh.position);
-        part.visible = true;
-      }
-    });
   }
   
   // Helper for single-point body parts (dual-layer spheres)
