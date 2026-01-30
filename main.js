@@ -278,7 +278,7 @@ window.addEventListener('unhandledrejection', (event) => {
         }
         
         updateAvatarFromPose(avatar, latestPose.world, (x, y, z, scale) => {
-          return new THREE.Vector3(x, y + 1.6, -z);
+          return new THREE.Vector3(x, -y + 1.6, -z);
         });
       }
       // Fallback to screen landmarks (2D tracking)
