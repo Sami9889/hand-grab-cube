@@ -208,17 +208,21 @@ window.addEventListener('unhandledrejection', (event) => {
       const lm = ev.data.normalized || [];
       const world = ev.data.world || null;
       
+      console.log('[TRACKING EVENT] Pose received - normalized:', lm.length, 'world:', world ? world.length : 'none');
+      
       latestPosePerCamera[camIdx] = { landmarks: lm, world: world };
       
       // Use first available camera's data
       const first = latestPosePerCamera.find(p => p && (p.landmarks || p.world));
       if (first) {
-        if (first.world) {
+        if (first.world && first.world.length > 0) {
           latestPose = { world: first.world };
           hud.set('Tracking', `3D: ${first.world.length} landmarks`);
-        } else if (first.landmarks) {
+          console.log('[TRACKING] Using 3D world landmarks');
+        } else if (first.landmarks && first.landmarks.length > 0) {
           latestPose = { landmarks: first.landmarks };
           hud.set('Tracking', `2D: ${first.landmarks.length} landmarks`);
+          console.log('[TRACKING] Using 2D screen landmarks');
         }
       }
       
@@ -227,6 +231,7 @@ window.addEventListener('unhandledrejection', (event) => {
       if (available.length > 1) {
         latestPose = { world: fuseAverages(available.map(p => p.world)) };
         hud.set('Fusion', `${available.length} cameras`);
+        console.log('[TRACKING] Fused', available.length, 'cameras');
       }
     }
   }
