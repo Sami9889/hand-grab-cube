@@ -387,44 +387,25 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
         const baseHeight = part.geometry.parameters.height || 1;
         part.scale.y = (length + extraLength) / baseHeight;
         
-        // IMPROVED ROTATION SYSTEM - Fix upside-down mesh issue
-        // Normalize direction vector for accurate rotation
+        // Improved rotation to align with joint direction
+        // Use proper vector normalization and add fine-tuning for orientation
         const normalizedDirection = direction.clone().normalize();
         const upVector = new THREE.Vector3(0, 1, 0);
         
-        // Create rotation matrix for proper orientation
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromUnitVectors(upVector, normalizedDirection);
+        // Calculate rotation quaternion with improved precision
+        part.quaternion.setFromUnitVectors(upVector, normalizedDirection);
         
-        // CRITICAL FIX: Add multiple orientation corrections for different angles
-        // This ensures meshes are never upside down regardless of body position
-        
-        // Check if the mesh would be inverted (upside down)
-        const testUp = upVector.clone().applyQuaternion(quaternion);
-        const worldUp = new THREE.Vector3(0, 1, 0);
-        
-        // If the local up is pointing significantly downward in world space, correct it
-        if (testUp.dot(worldUp) < -0.5) {
-          // Apply 180-degree roll correction to flip the mesh right-side up
-          const rollCorrection = new THREE.Quaternion().setFromAxisAngle(
-            normalizedDirection, 
+        // Add fine rotation adjustments to prevent upside-down meshes
+        // Apply correction based on the direction vector to ensure proper orientation
+        if (normalizedDirection.y < -0.9) {
+          // If pointing strongly downward, add 180-degree correction
+          const correctionQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0), 
             Math.PI
           );
-          quaternion.multiply(rollCorrection);
+          part.quaternion.multiply(correctionQuat);
         }
         
-        // Additional correction for near-vertical orientations
-        if (Math.abs(normalizedDirection.y) > 0.95) {
-          // For near-vertical body parts, ensure proper alignment
-          const pitchCorrection = new THREE.Quaternion().setFromAxisAngle(
-            new THREE.Vector3(1, 0, 0), 
-            Math.PI * 0.5 * Math.sign(normalizedDirection.y)
-          );
-          quaternion.premultiply(pitchCorrection);
-        }
-        
-        // Apply final corrected quaternion
-        part.quaternion.copy(quaternion);
         part.visible = true;
       });
     } else {
