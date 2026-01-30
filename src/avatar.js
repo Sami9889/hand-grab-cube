@@ -398,13 +398,6 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
     }
-    
-    [partWire, partSolid].forEach(part => {
-      if (part) {
-        part.position.copy(joint.mesh.position);
-        part.visible = true;
-      }
-    });
   }
   
   // Helper for single-point body parts (dual-layer spheres)
