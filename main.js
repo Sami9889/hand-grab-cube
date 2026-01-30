@@ -39,13 +39,6 @@ window.addEventListener('unhandledrejection', (event) => {
   console.log('3D Avatar created:', avatar);
   avatar.group.visible = true;
   avatar.group.position.set(0, 0, 0);
-  
-  // Physics body for avatar
-  avatar.physicsBody = {
-    position: { x: 0, y: 1.6, z: 0 },
-    velocity: { x: 0, y: 0, z: 0 },
-    mass: 80
-  };
 
   // HUD
   const hud = createHUD(document.body);
@@ -117,11 +110,13 @@ window.addEventListener('unhandledrejection', (event) => {
         document.body.appendChild(v);
         
         try {
+          console.log('[MAIN] Starting camera with deviceId:', deviceId);
           const handle = await tracking.startCamera(v, { deviceId });
           activeCamHandles.push(handle);
           started++;
+          console.log('[MAIN] Camera started successfully');
         } catch (e) {
-          console.warn('Camera start failed:', e);
+          console.error('[MAIN] Camera start failed:', e);
         }
       }
       
@@ -131,6 +126,8 @@ window.addEventListener('unhandledrejection', (event) => {
           ? `Status: Tracking active (${started} camera${started > 1 ? 's' : ''})` 
           : 'Status: Failed to start cameras';
       }
+      
+      console.log('[MAIN] Started', started, 'camera(s)');
     });
   }
   
@@ -208,15 +205,15 @@ window.addEventListener('unhandledrejection', (event) => {
       
       latestPosePerCamera[camIdx] = { landmarks: lm, world: world };
       
-      // Use first available camera's data
-      const first = latestPosePerCamera.find(p => p && (p.landmarks || p.world));
+      // Prefer world landmarks (3D) over normalized landmarks (2D)
+      const first = latestPosePerCamera.find(p => p && (p.world || p.landmarks));
       if (first) {
-        if (first.world) {
+        if (first.world && first.world.length > 0) {
           latestPose = { world: first.world };
-          hud.set('Tracking', `3D: ${first.world.length} landmarks`);
-        } else if (first.landmarks) {
+          hud.set('Tracking', `3D World (${first.world.length})`);
+        } else if (first.landmarks && first.landmarks.length > 0) {
           latestPose = { landmarks: first.landmarks };
-          hud.set('Tracking', `2D: ${first.landmarks.length} landmarks`);
+          hud.set('Tracking', `2D Screen (${first.landmarks.length})`);
         }
       }
       
@@ -224,7 +221,7 @@ window.addEventListener('unhandledrejection', (event) => {
       const available = latestPosePerCamera.filter(p => p?.world);
       if (available.length > 1) {
         latestPose = { world: fuseAverages(available.map(p => p.world)) };
-        hud.set('Fusion', `${available.length} cameras`);
+        hud.set('Fusion', `${available.length} cameras fused`);
       }
     }
   }
@@ -245,90 +242,53 @@ window.addEventListener('unhandledrejection', (event) => {
 
   // Render loop
   let frameCount = 0;
+  let lastLogTime = 0;
+  
   startLoop(renderer, scene, camera, (dt) => {
     frameCount++;
+    const now = performance.now();
     
     if (latestPose) {
-      let trackedPos = null;
-      let smoothingFactor = smoothing;
-      
       // Use world landmarks if available (3D tracking)
       if (latestPose.world?.length) {
-        if (frameCount % 60 === 0) {
-          console.log('[Tracking] World landmarks:', latestPose.world.length);
+        // Log occasionally for debugging
+        if (now - lastLogTime > 3000) {
+          console.log('[RENDER] 3D WORLD TRACKING ACTIVE');
+          console.log('[RENDER] Landmarks:', latestPose.world.length);
+          console.log('[RENDER] Hip landmark:', JSON.stringify(latestPose.world[23]));
+          lastLogTime = now;
         }
         
-        const supportFoot = getSupportFootPosition(latestPose.world);
-        if (supportFoot) {
-          trackedPos = { 
-            x: supportFoot.x, 
-            y: supportFoot.y + 1.6, 
-            z: -supportFoot.z 
-          };
-          smoothingFactor = 0.85;
-        } else {
-          const pelvis = latestPose.world[23] || latestPose.world[24] || latestPose.world[0];
-          if (pelvis) {
-            trackedPos = { 
-              x: pelvis.x, 
-              y: pelvis.y + 1.6, 
-              z: -pelvis.z 
-            };
-          }
-        }
-        
-        updateAvatarFromPose(avatar, latestPose.world, (x, y, z, scale) => {
-          return new THREE.Vector3(x, y + 1.6, -z);
+        updateAvatarFromPose(avatar, latestPose.world, (x, y, z) => {
+          // MediaPipe world landmarks are in meters
+          // Scale up for visibility and flip axes
+          return new THREE.Vector3(-x * 2.5, y * 2.5, -z * 2.5);
         });
       }
       // Fallback to screen landmarks (2D tracking)
       else if (latestPose.landmarks) {
-        if (frameCount % 60 === 0) {
-          console.log('[Tracking] Screen landmarks:', latestPose.landmarks.length);
+        // Log occasionally for debugging
+        if (now - lastLogTime > 3000) {
+          console.log('[RENDER] 2D SCREEN TRACKING ACTIVE');
+          console.log('[RENDER] Landmarks:', latestPose.landmarks.length);
+          console.log('[RENDER] Hip landmark:', JSON.stringify(latestPose.landmarks[23]));
+          lastLogTime = now;
         }
         
-        const supportFoot = getSupportFootPosition(latestPose.landmarks);
-        if (supportFoot) {
-          const ndcX = (supportFoot.x - 0.5) * 2;
-          const ndcY = -(supportFoot.y - 0.5) * 2;
-          const ndcZ = -0.3 - (supportFoot.z * 1.6);
-          const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
-          v.unproject(camera);
-          trackedPos = { x: v.x, y: v.y, z: v.z };
-          smoothingFactor = 0.85;
-        } else {
-          const pelvis = latestPose.landmarks[23] || latestPose.landmarks[24] || latestPose.landmarks[0];
-          if (pelvis) {
-            const ndcX = (pelvis.x - 0.5) * 2;
-            const ndcY = -(pelvis.y - 0.5) * 2;
-            const ndcZ = -0.3 - (pelvis.z * 1.6);
-            const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
-            v.unproject(camera);
-            trackedPos = { x: v.x, y: v.y, z: v.z };
-          }
-        }
-        
-        updateAvatarFromPose(avatar, latestPose.landmarks, (x, y, z, scale) => {
-          const ndcX = (x - 0.5) * 2;
-          const ndcY = -(y - 0.5) * 2;
-          const ndcZ = -0.3 - (z * 1.6);
-          const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
-          v.unproject(camera);
-          return v;
+        updateAvatarFromPose(avatar, latestPose.landmarks, (x, y, z) => {
+          // MediaPipe normalized landmarks are in [0,1] screen space
+          // Simple conversion to world space
+          return new THREE.Vector3(
+            (0.5 - x) * 4,  // Mirror X and scale
+            (0.5 - y) * 4,  // Flip Y and scale
+            -z * 2          // Depth
+          );
         });
       }
-      
-      // Physics stabilization
-      if (avatar.physicsBody && trackedPos) {
-        clampVelocity(avatar.physicsBody, 4);
-        clampPosition(avatar.physicsBody, -2, 3);
-        
-        avatar.physicsBody.position.x = avatar.physicsBody.position.x * (1 - smoothingFactor) + trackedPos.x * smoothingFactor;
-        avatar.physicsBody.position.y = avatar.physicsBody.position.y * (1 - smoothingFactor) + trackedPos.y * smoothingFactor;
-        avatar.physicsBody.position.z = avatar.physicsBody.position.z * (1 - smoothingFactor) + trackedPos.z * smoothingFactor;
-        avatar.physicsBody.velocity.x = 0;
-        avatar.physicsBody.velocity.y = 0;
-        avatar.physicsBody.velocity.z = 0;
+    } else {
+      if (now - lastLogTime > 3000) {
+        console.log('[RENDER] NO POSE DATA - waiting for tracking...');
+        lastLogTime = now;
       }
     }
   }, { updateCamera });

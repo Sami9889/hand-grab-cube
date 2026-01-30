@@ -7,10 +7,10 @@ export function createAvatar(scene) {
   
   // Bright, easy-to-see material
   const mat = new THREE.MeshStandardMaterial({ 
-    color: 0xff6600,  // Bright orange
+    color: 0xff0066,  // Bright pink/magenta
     wireframe: false,  // Solid, not wireframe
-    emissive: 0xff3300,  // Self-illuminated
-    emissiveIntensity: 0.3
+    emissive: 0xff0066,  // Self-illuminated
+    emissiveIntensity: 0.6
   });
   
   const joints = {};
@@ -26,7 +26,7 @@ export function createAvatar(scene) {
   // Create visible spheres for each joint
   jointNames.forEach(name => {
     const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 16, 16),  // Larger, more visible
+      new THREE.SphereGeometry(0.06, 16, 16),  // Larger, more visible
       mat.clone()
     );
     sphere.visible = true;
@@ -36,7 +36,6 @@ export function createAvatar(scene) {
       mesh: sphere, 
       pos: new THREE.Vector3() 
     };
-    console.log('[AVATAR] Created joint:', name);
   });
   
   // Create limbs (connections between joints)
@@ -57,31 +56,30 @@ export function createAvatar(scene) {
   
   const limbs = limbPairs.map(([a, b]) => {
     const cylinder = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.04, 0.04, 1, 12),
+      new THREE.CylinderGeometry(0.03, 0.03, 1, 8),
       mat.clone()
     );
     cylinder.visible = true;
     cylinder.castShadow = true;
     group.add(cylinder);
-    console.log('[AVATAR] Created limb:', a, '->', b);
     return { mesh: cylinder, a, b };
   });
   
   scene.add(group);
   group.visible = true;
   
-  console.log('[AVATAR] Avatar created with', Object.keys(joints).length, 'joints and', limbs.length, 'limbs');
-  
-  return { group, joints, limbs, smoothFactor: 0.7 };
+  return { group, joints, limbs };
 }
 
 export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   if (!avatar || !landmarks || landmarks.length === 0) {
-    console.log('[AVATAR] No update - missing data');
     return;
   }
   
-  console.log('[AVATAR] Updating with', landmarks.length, 'landmarks');
+  if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+    console.error('[AVATAR] landmarkToWorld must be a function');
+    return;
+  }
   
   // MediaPipe Pose landmark indices
   const map = {
@@ -102,14 +100,27 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   
   // Update joint positions
   for (const [name, idx] of Object.entries(map)) {
-    if (!landmarks[idx] || !avatar.joints[name]) continue;
+    if (!landmarks[idx] || !avatar.joints[name]) {
+      continue;
+    }
     
     const lm = landmarks[idx];
     const joint = avatar.joints[name];
     
+    // Check visibility (if available) - lower threshold
+    if (lm.visibility !== undefined && lm.visibility < 0.1) {
+      joint.mesh.visible = false;
+      continue;
+    }
+    
     try {
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
-      joint.pos.lerp(worldPos, avatar.smoothFactor);
+      if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
+        continue;
+      }
+      
+      // Smooth but responsive
+      joint.pos.lerp(worldPos, 0.7);
       joint.mesh.position.copy(joint.pos);
       joint.mesh.visible = true;
     } catch (e) {
@@ -122,7 +133,10 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const jointA = avatar.joints[limb.a];
     const jointB = avatar.joints[limb.b];
     
-    if (!jointA || !jointB) continue;
+    if (!jointA || !jointB || !jointA.mesh.visible || !jointB.mesh.visible) {
+      limb.mesh.visible = false;
+      continue;
+    }
     
     try {
       const posA = jointA.mesh.position;
@@ -150,6 +164,4 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       console.error('[AVATAR] Error updating limb:', e);
     }
   }
-  
-  console.log('[AVATAR] Update complete');
 }
