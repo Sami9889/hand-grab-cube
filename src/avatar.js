@@ -81,7 +81,10 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     return;
   }
   
-  console.log('[AVATAR] Updating with', landmarks.length, 'landmarks');
+  if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+    console.error('[AVATAR] landmarkToWorld must be a function');
+    return;
+  }
   
   // MediaPipe Pose landmark indices
   const map = {
@@ -100,22 +103,42 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     rightAnkle: 28
   };
   
+  let visibleCount = 0;
+  
   // Update joint positions
   for (const [name, idx] of Object.entries(map)) {
-    if (!landmarks[idx] || !avatar.joints[name]) continue;
+    if (!landmarks[idx] || !avatar.joints[name]) {
+      console.log(`[AVATAR] Missing landmark or joint for ${name} (idx: ${idx})`);
+      continue;
+    }
     
     const lm = landmarks[idx];
     const joint = avatar.joints[name];
     
+    // Check visibility (if available)
+    if (lm.visibility !== undefined && lm.visibility < 0.3) {
+      console.log(`[AVATAR] Low visibility for ${name}: ${lm.visibility}`);
+      joint.mesh.visible = false;
+      continue;
+    }
+    
     try {
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
+      if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
+        console.error(`[AVATAR] Invalid world position for ${name}:`, worldPos);
+        continue;
+      }
+      
       joint.pos.lerp(worldPos, avatar.smoothFactor);
       joint.mesh.position.copy(joint.pos);
       joint.mesh.visible = true;
+      visibleCount++;
     } catch (e) {
       console.error('[AVATAR] Error updating joint', name, ':', e);
     }
   }
+  
+  console.log(`[AVATAR] Updated ${visibleCount} visible joints out of ${Object.keys(map).length}`);
   
   // Update limbs (connections)
   for (const limb of avatar.limbs) {
