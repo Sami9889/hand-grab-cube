@@ -22,7 +22,7 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
     perfMode = !!p;
     frameInterval = perfMode ? 66 : 33;
     hands.setOptions({ maxNumHands: 1, modelComplexity: perfMode?0:1, minDetectionConfidence: perfMode?0.45:0.6, minTrackingConfidence: perfMode?0.45:0.6 });
-    pose.setOptions({ modelComplexity: perfMode?0:1, smoothLandmarks: true, minDetectionConfidence: perfMode?0.45:0.6 });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false, smoothSegmentation: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
     faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: perfMode?false:true, minDetectionConfidence: perfMode?0.45:0.6 });
     emit('perf', { perfMode });
   }
@@ -161,7 +161,7 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
       };
       const camIdx = poseCams.length;
       const myPose = new PoseCls({ locateFile: (f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-      myPose.setOptions({ modelComplexity: perfMode?0:1, smoothLandmarks: true, minDetectionConfidence: perfMode?0.45:0.6 });
+      myPose.setOptions({ modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false, smoothSegmentation: false, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
       myPose.onResults((r)=>{ 
         const normalized = r.poseLandmarks || [];
         const world = r.poseWorldLandmarks || null;
@@ -227,7 +227,31 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
 
   function setActive(mode) { active = mode; emit('mode', { mode }); }
 
-  applyPerf(perfMode);
+  // Initialize pose with better settings for world landmarks
+  pose.setOptions({ 
+    modelComplexity: 1, 
+    smoothLandmarks: true, 
+    enableSegmentation: false, 
+    smoothSegmentation: false,
+    minDetectionConfidence: 0.5, 
+    minTrackingConfidence: 0.5 
+  });
+  
+  hands.setOptions({ 
+    maxNumHands: 2, 
+    modelComplexity: 1, 
+    minDetectionConfidence: 0.5, 
+    minTrackingConfidence: 0.5 
+  });
+  
+  faceMesh.setOptions({ 
+    maxNumFaces: 1, 
+    refineLandmarks: true, 
+    minDetectionConfidence: 0.5, 
+    minTrackingConfidence: 0.5 
+  });
+
+  console.log('[TRACKING] Initialized with pose active, modelComplexity: 1');
 
   return { startCamera, stopCamera, useTestVideo, setActive, applyPerf };
 }
