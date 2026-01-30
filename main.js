@@ -190,6 +190,10 @@ window.addEventListener('unhandledrejection', (event) => {
   // Tracking data
   let latestPose = null;
   const latestPosePerCamera = [];
+  
+  // Physics tracking variables
+  let trackedPos = null;
+  let smoothingFactor = 0.5;
 
   // Tracking event handler
   function handleTrackingEvent(ev) {
