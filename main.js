@@ -212,8 +212,8 @@ window.addEventListener('unhandledrejection', (event) => {
       
       latestPosePerCamera[camIdx] = { landmarks: lm, world: world };
       
-      // Use first available camera's data
-      const first = latestPosePerCamera.find(p => p && (p.landmarks || p.world));
+      // Prefer world landmarks (3D) over normalized landmarks (2D)
+      const first = latestPosePerCamera.find(p => p && (p.world || p.landmarks));
       if (first) {
         if (first.world && first.world.length > 0) {
           latestPose = { world: first.world };
@@ -252,17 +252,20 @@ window.addEventListener('unhandledrejection', (event) => {
 
   // Render loop
   let frameCount = 0;
+  let lastLogTime = 0;
+  
   startLoop(renderer, scene, camera, (dt) => {
     frameCount++;
+    const now = performance.now();
     
     if (latestPose) {
-      let trackedPos = null;
-      let smoothingFactor = smoothing;
-      
       // Use world landmarks if available (3D tracking)
       if (latestPose.world?.length) {
-        if (frameCount % 60 === 0) {
-          console.log('[Tracking] World landmarks:', latestPose.world.length);
+        // Log occasionally for debugging
+        if (now - lastLogTime > 2000) {
+          console.log('[3D TRACKING] Using world landmarks:', latestPose.world.length);
+          console.log('[3D TRACKING] Sample landmark (hip):', latestPose.world[23]);
+          lastLogTime = now;
         }
         
         const supportFoot = getSupportFootPosition(latestPose.world);
@@ -293,8 +296,10 @@ window.addEventListener('unhandledrejection', (event) => {
       }
       // Fallback to screen landmarks (2D tracking)
       else if (latestPose.landmarks) {
-        if (frameCount % 60 === 0) {
-          console.log('[Tracking] Screen landmarks:', latestPose.landmarks.length);
+        // Log occasionally for debugging
+        if (now - lastLogTime > 2000) {
+          console.log('[2D TRACKING] Using screen landmarks:', latestPose.landmarks.length);
+          lastLogTime = now;
         }
         
         const supportFoot = getSupportFootPosition(latestPose.landmarks);
@@ -330,19 +335,6 @@ window.addEventListener('unhandledrejection', (event) => {
           v.unproject(camera);
           return v;
         });
-      }
-      
-      // Physics stabilization
-      if (avatar.physicsBody && trackedPos) {
-        clampVelocity(avatar.physicsBody, 4);
-        clampPosition(avatar.physicsBody, -2, 3);
-        
-        avatar.physicsBody.position.x = avatar.physicsBody.position.x * (1 - smoothingFactor) + trackedPos.x * smoothingFactor;
-        avatar.physicsBody.position.y = avatar.physicsBody.position.y * (1 - smoothingFactor) + trackedPos.y * smoothingFactor;
-        avatar.physicsBody.position.z = avatar.physicsBody.position.z * (1 - smoothingFactor) + trackedPos.z * smoothingFactor;
-        avatar.physicsBody.velocity.x = 0;
-        avatar.physicsBody.velocity.y = 0;
-        avatar.physicsBody.velocity.z = 0;
       }
     }
   }, { updateCamera });
