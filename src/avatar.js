@@ -172,17 +172,17 @@ export function createAvatar(scene) {
   group.add(pelvisSolid);
   bodyParts.pelvisSolid = pelvisSolid;
   
-  // Function to create HIGH-DETAIL dual-layer limb (wireframe + solid) with 32+ segments
+  // Function to create dual-layer limb (wireframe + solid)
   function createGridLimb(radiusTop, radiusBottom, height, name) {
     const wireframe = new THREE.Mesh(
-      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 32, 32),  // 32 radial, 32 height segments
+      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 16, 16),
       gridMat.clone()
     );
     wireframe.castShadow = true;
     group.add(wireframe);
     
     const solid = new THREE.Mesh(
-      new THREE.CylinderGeometry(radiusTop * 0.9, radiusBottom * 0.9, height, 32, 32),
+      new THREE.CylinderGeometry(radiusTop * 0.9, radiusBottom * 0.9, height, 16, 16),
       solidGridMat.clone()
     );
     group.add(solid);
@@ -192,44 +192,11 @@ export function createAvatar(scene) {
     return { wireframe, solid };
   }
   
-  // Function to create detailed sphere joints (50+ segments)
-  function createDetailedJoint(radius, name, color = null) {
-    const mat = color ? new THREE.MeshStandardMaterial({ 
-      color: color, 
-      emissive: color, 
-      emissiveIntensity: 0.4,
-      transparent: true,
-      opacity: 0.85
-    }) : gridMat.clone();
-    
-    const wireframe = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 32, 32),  // High detail
-      mat
-    );
-    wireframe.castShadow = true;
-    group.add(wireframe);
-    bodyParts[name] = wireframe;
-    return wireframe;
-  }
-  
-  // SHOULDERS - Joint spheres
-  createDetailedJoint(0.07, 'leftShoulderJoint', 0xff6600);
-  createDetailedJoint(0.07, 'rightShoulderJoint', 0xff6600);
-  
   // ARMS - High-poly cylinders
   createGridLimb(0.045, 0.04, 0.3, 'leftUpperArm');
   createGridLimb(0.045, 0.04, 0.3, 'rightUpperArm');
-  
-  // ELBOWS - Joint spheres
-  createDetailedJoint(0.055, 'leftElbowJoint', 0xff8800);
-  createDetailedJoint(0.055, 'rightElbowJoint', 0xff8800);
-  
   createGridLimb(0.04, 0.035, 0.28, 'leftForearm');
   createGridLimb(0.04, 0.035, 0.28, 'rightForearm');
-  
-  // WRISTS - Joint spheres
-  createDetailedJoint(0.045, 'leftWristJoint', 0xffaa00);
-  createDetailedJoint(0.045, 'rightWristJoint', 0xffaa00);
   
   // HANDS - High-poly spheres
   const leftHandWireframe = new THREE.Mesh(
@@ -260,24 +227,11 @@ export function createAvatar(scene) {
   group.add(rightHandSolid);
   bodyParts.rightHandSolid = rightHandSolid;
   
-  // HIPS - Joint spheres
-  createDetailedJoint(0.08, 'leftHipJoint', 0x00ff88);
-  createDetailedJoint(0.08, 'rightHipJoint', 0x00ff88);
-  
   // LEGS - High-poly cylinders
   createGridLimb(0.08, 0.06, 0.45, 'leftThigh');
   createGridLimb(0.08, 0.06, 0.45, 'rightThigh');
-  
-  // KNEES - Joint spheres
-  createDetailedJoint(0.07, 'leftKneeJoint', 0x00ffaa);
-  createDetailedJoint(0.07, 'rightKneeJoint', 0x00ffaa);
-  
   createGridLimb(0.06, 0.045, 0.45, 'leftShin');
   createGridLimb(0.06, 0.045, 0.45, 'rightShin');
-  
-  // ANKLES - Joint spheres
-  createDetailedJoint(0.055, 'leftAnkleJoint', 0x00ffcc);
-  createDetailedJoint(0.055, 'rightAnkleJoint', 0x00ffcc);
   
   // FEET - High-poly boxes with grid
   const leftFootWireframe = new THREE.Mesh(
@@ -307,141 +261,6 @@ export function createAvatar(scene) {
   );
   group.add(rightFootSolid);
   bodyParts.rightFootSolid = rightFootSolid;
-  
-  // ADDITIONAL DETAILED COMPONENTS (50+ more parts)
-  
-  // SPINE SEGMENTS - 5 vertebrae spheres for detailed spine tracking
-  for (let i = 0; i < 5; i++) {
-    createDetailedJoint(0.04, `spineSegment${i}`, 0x4488ff);
-  }
-  
-  // RIBS - Left and right rib cage arcs (10 ribs each side)
-  for (let i = 0; i < 10; i++) {
-    const ribMat = new THREE.MeshStandardMaterial({
-      color: 0x0088ff,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.5
-    });
-    
-    const leftRib = new THREE.Mesh(
-      new THREE.TorusGeometry(0.08 + i * 0.01, 0.01, 8, 16, Math.PI),
-      ribMat
-    );
-    group.add(leftRib);
-    bodyParts[`leftRib${i}`] = leftRib;
-    
-    const rightRib = new THREE.Mesh(
-      new THREE.TorusGeometry(0.08 + i * 0.01, 0.01, 8, 16, Math.PI),
-      ribMat.clone()
-    );
-    group.add(rightRib);
-    bodyParts[`rightRib${i}`] = rightRib;
-  }
-  
-  // FINGER SEGMENTS - Individual finger bones (3 segments × 5 fingers × 2 hands = 30)
-  const fingerNames = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-  ['left', 'right'].forEach(side => {
-    fingerNames.forEach(finger => {
-      for (let segment = 0; segment < 3; segment++) {
-        const fingerPart = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.008, 0.007, 0.025, 8, 4),
-          new THREE.MeshStandardMaterial({
-            color: 0xffcc99,
-            transparent: true,
-            opacity: 0.7
-          })
-        );
-        group.add(fingerPart);
-        bodyParts[`${side}${finger}Segment${segment}`] = fingerPart;
-      }
-    });
-  });
-  
-  // CLAVICLES - Collar bones
-  const leftClavicle = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.025, 0.15, 12, 8),
-    gridMat.clone()
-  );
-  group.add(leftClavicle);
-  bodyParts.leftClavicle = leftClavicle;
-  
-  const rightClavicle = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.025, 0.15, 12, 8),
-    gridMat.clone()
-  );
-  group.add(rightClavicle);
-  bodyParts.rightClavicle = rightClavicle;
-  
-  // SCAPULAS - Shoulder blades (triangular shapes)
-  ['left', 'right'].forEach(side => {
-    const scapulaShape = new THREE.Shape();
-    scapulaShape.moveTo(0, 0);
-    scapulaShape.lineTo(0.08, -0.12);
-    scapulaShape.lineTo(0, -0.15);
-    scapulaShape.lineTo(0, 0);
-    
-    const scapulaGeom = new THREE.ShapeGeometry(scapulaShape);
-    const scapula = new THREE.Mesh(
-      scapulaGeom,
-      new THREE.MeshStandardMaterial({
-        color: 0x0088ff,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
-      })
-    );
-    group.add(scapula);
-    bodyParts[`${side}Scapula`] = scapula;
-  });
-  
-  // TOE SEGMENTS - Individual toes (5 toes × 2 feet = 10)
-  for (let i = 0; i < 5; i++) {
-    const leftToe = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.01, 0.03, 8, 4),
-      new THREE.MeshStandardMaterial({ color: 0x666666, transparent: true, opacity: 0.8 })
-    );
-    group.add(leftToe);
-    bodyParts[`leftToe${i}`] = leftToe;
-    
-    const rightToe = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.012, 0.01, 0.03, 8, 4),
-      new THREE.MeshStandardMaterial({ color: 0x666666, transparent: true, opacity: 0.8 })
-    );
-    group.add(rightToe);
-    bodyParts[`rightToe${i}`] = rightToe;
-  }
-  
-  // EYES - Glowing spheres
-  createDetailedJoint(0.02, 'leftEyeSphere', 0x00ffff);
-  createDetailedJoint(0.02, 'rightEyeSphere', 0x00ffff);
-  
-  // EARS - Small detailed meshes
-  ['left', 'right'].forEach(side => {
-    const ear = new THREE.Mesh(
-      new THREE.SphereGeometry(0.035, 16, 16),
-      new THREE.MeshStandardMaterial({
-        color: 0xffccaa,
-        transparent: true,
-        opacity: 0.7
-      })
-    );
-    group.add(ear);
-    bodyParts[`${side}EarMesh`] = ear;
-  });
-  
-  // JAW - Lower face mesh
-  const jaw = new THREE.Mesh(
-    new THREE.BoxGeometry(0.1, 0.06, 0.08, 8, 4, 6),
-    new THREE.MeshStandardMaterial({
-      color: 0xffccaa,
-      transparent: true,
-      opacity: 0.6,
-      wireframe: true
-    })
-  );
-  group.add(jaw);
-  bodyParts.jaw = jaw;
   
   scene.add(group);
   group.visible = true;
@@ -579,25 +398,23 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
     }
+    
+    [partWire, partSolid].forEach(part => {
+      if (part) {
+        part.position.copy(joint.mesh.position);
+        part.visible = true;
+      }
+    });
   }
   
-  // Helper for single-point body parts (dual-layer spheres OR single parts)
+  // Helper for single-point body parts (dual-layer spheres)
   function updateDualSphere(wireframeName, solidName, joint) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
-    if (!joint || !joint.mesh.visible) {
+    if (!joint || !joint.mesh.visible || !partWire || !partSolid) {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
-      return;
-    }
-    
-    // Handle single part (when wireframe and solid are same)
-    if (wireframeName === solidName) {
-      if (partWire) {
-        partWire.position.copy(joint.mesh.position);
-        partWire.visible = true;
-      }
       return;
     }
     
@@ -609,19 +426,29 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     });
   }
   
-  // Update body parts
+  // Update high-detail grid body parts with dual-layer rendering
   if (avatar.bodyParts) {
-    const bp = avatar.bodyParts;
     const j = avatar.joints;
     
-    // HEAD - position at nose
-    if (bp.head && j.nose) {
-      bp.head.position.copy(j.nose.mesh.position);
-      bp.head.visible = true;
+    // HEAD - position at nose/face center
+    updateDualSphere('headWireframe', 'headSolid', j.nose);
+    
+    // NECK - between head and shoulders
+    if (j.nose && j.leftShoulder && j.rightShoulder) {
+      const shoulderCenter = new THREE.Vector3()
+        .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
+        .multiplyScalar(0.5);
+      const neckTop = j.nose.mesh.position.clone();
+      neckTop.y -= 0.1; // slightly below head
+      
+      updateDualBodyPart('neckWireframe', 'neckSolid', 
+        { mesh: { position: neckTop, visible: true } }, 
+        { mesh: { position: shoulderCenter, visible: true } }
+      );
     }
     
     // TORSO - between shoulders and hips center
-    if (bp.torso && j.leftShoulder && j.rightShoulder && j.leftHip && j.rightHip) {
+    if (j.leftShoulder && j.rightShoulder && j.leftHip && j.rightHip) {
       const shoulderCenter = new THREE.Vector3()
         .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
         .multiplyScalar(0.5);
@@ -629,182 +456,88 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
         .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
         .multiplyScalar(0.5);
       
-      const torsoMid = new THREE.Vector3()
-        .addVectors(shoulderCenter, hipCenter)
-        .multiplyScalar(0.5);
-      bp.torso.position.copy(torsoMid);
-      
-      const torsoDir = new THREE.Vector3().subVectors(shoulderCenter, hipCenter);
-      const torsoLength = torsoDir.length();
-      if (torsoLength > 0.01) {
-        bp.torso.scale.y = torsoLength / bp.torso.geometry.parameters.height;
-        bp.torso.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          torsoDir.normalize()
-        );
-        bp.torso.visible = true;
-      }
+      updateDualBodyPart('torsoWireframe', 'torsoSolid',
+        { mesh: { position: shoulderCenter, visible: true } },
+        { mesh: { position: hipCenter, visible: true } }
+      );
     }
     
-    // PELVIS - between hips
-    if (bp.pelvis && j.leftHip && j.rightHip) {
+    // PELVIS - at hip center
+    if (j.leftHip && j.rightHip) {
       const hipCenter = new THREE.Vector3()
         .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
         .multiplyScalar(0.5);
-      bp.pelvis.position.copy(hipCenter);
-      bp.pelvis.visible = true;
+      
+      ['pelvisWireframe', 'pelvisSolid'].forEach(name => {
+        const part = avatar.bodyParts[name];
+        if (part) {
+          part.position.copy(hipCenter);
+          part.visible = true;
+        }
+      });
     }
     
-    // ARMS
-    updateBodyPart(bp.leftUpperArm, j.leftShoulder, j.leftElbow);
-    updateBodyPart(bp.rightUpperArm, j.rightShoulder, j.rightElbow);
-    updateBodyPart(bp.leftForearm, j.leftElbow, j.leftWrist);
-    updateBodyPart(bp.rightForearm, j.rightElbow, j.rightWrist);
+    // ARMS - Dual-layer high-detail cylinders
+    updateDualBodyPart('leftUpperArmWireframe', 'leftUpperArmSolid', j.leftShoulder, j.leftElbow);
+    updateDualBodyPart('rightUpperArmWireframe', 'rightUpperArmSolid', j.rightShoulder, j.rightElbow);
+    updateDualBodyPart('leftForearmWireframe', 'leftForearmSolid', j.leftElbow, j.leftWrist);
+    updateDualBodyPart('rightForearmWireframe', 'rightForearmSolid', j.rightElbow, j.rightWrist);
     
-    // HANDS
-    if (bp.leftHand && j.leftWrist) {
-      bp.leftHand.position.copy(j.leftWrist.mesh.position);
-      bp.leftHand.visible = true;
-    }
-    if (bp.rightHand && j.rightWrist) {
-      bp.rightHand.position.copy(j.rightWrist.mesh.position);
-      bp.rightHand.visible = true;
-    }
+    // HANDS - Dual-layer spheres
+    updateDualSphere('leftHandWireframe', 'leftHandSolid', j.leftWrist);
+    updateDualSphere('rightHandWireframe', 'rightHandSolid', j.rightWrist);
     
-    // LEGS
-    updateBodyPart(bp.leftThigh, j.leftHip, j.leftKnee);
-    updateBodyPart(bp.rightThigh, j.rightHip, j.rightKnee);
-    updateBodyPart(bp.leftShin, j.leftKnee, j.leftAnkle);
-    updateBodyPart(bp.rightShin, j.rightKnee, j.rightAnkle);
+    // LEGS - Dual-layer high-detail cylinders
+    updateDualBodyPart('leftThighWireframe', 'leftThighSolid', j.leftHip, j.leftKnee);
+    updateDualBodyPart('rightThighWireframe', 'rightThighSolid', j.rightHip, j.rightKnee);
+    updateDualBodyPart('leftShinWireframe', 'leftShinSolid', j.leftKnee, j.leftAnkle);
+    updateDualBodyPart('rightShinWireframe', 'rightShinSolid', j.rightKnee, j.rightAnkle);
     
-    // FEET
-    if (bp.leftFoot && j.leftAnkle && j.leftFootIndex) {
+    // FEET - Dual-layer boxes with proper orientation
+    if (j.leftAnkle && j.leftFootIndex && j.leftHeel) {
       const footMid = new THREE.Vector3()
-        .addVectors(j.leftAnkle.mesh.position, j.leftFootIndex.mesh.position)
-        .multiplyScalar(0.5);
-      bp.leftFoot.position.copy(footMid);
+        .add(j.leftAnkle.mesh.position)
+        .add(j.leftFootIndex.mesh.position)
+        .add(j.leftHeel.mesh.position)
+        .multiplyScalar(1/3);
       
       const footDir = new THREE.Vector3()
-        .subVectors(j.leftFootIndex.mesh.position, j.leftAnkle.mesh.position);
-      if (footDir.length() > 0.01) {
-        bp.leftFoot.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          footDir.normalize()
-        );
-        bp.leftFoot.visible = true;
-      }
+        .subVectors(j.leftFootIndex.mesh.position, j.leftHeel.mesh.position);
+      
+      ['leftFootWireframe', 'leftFootSolid'].forEach(name => {
+        const part = avatar.bodyParts[name];
+        if (part && footDir.length() > 0.01) {
+          part.position.copy(footMid);
+          part.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            footDir.normalize()
+          );
+          part.visible = j.leftAnkle.mesh.visible && j.leftFootIndex.mesh.visible;
+        }
+      });
     }
     
-    if (bp.rightFoot && j.rightAnkle && j.rightFootIndex) {
+    if (j.rightAnkle && j.rightFootIndex && j.rightHeel) {
       const footMid = new THREE.Vector3()
-        .addVectors(j.rightAnkle.mesh.position, j.rightFootIndex.mesh.position)
-        .multiplyScalar(0.5);
-      bp.rightFoot.position.copy(footMid);
+        .add(j.rightAnkle.mesh.position)
+        .add(j.rightFootIndex.mesh.position)
+        .add(j.rightHeel.mesh.position)
+        .multiplyScalar(1/3);
       
       const footDir = new THREE.Vector3()
-        .subVectors(j.rightFootIndex.mesh.position, j.rightAnkle.mesh.position);
-      if (footDir.length() > 0.01) {
-        bp.rightFoot.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          footDir.normalize()
-        );
-        bp.rightFoot.visible = true;
-      }
-    }
-    
-    // UPDATE ALL 50+ ADDITIONAL DETAILED COMPONENTS
-    
-    // JOINT SPHERES - Position at joint locations for enhanced visualization
-    updateDualSphere('leftShoulderJoint', 'leftShoulderJoint', j.leftShoulder);
-    updateDualSphere('rightShoulderJoint', 'rightShoulderJoint', j.rightShoulder);
-    updateDualSphere('leftElbowJoint', 'leftElbowJoint', j.leftElbow);
-    updateDualSphere('rightElbowJoint', 'rightElbowJoint', j.rightElbow);
-    updateDualSphere('leftWristJoint', 'leftWristJoint', j.leftWrist);
-    updateDualSphere('rightWristJoint', 'rightWristJoint', j.rightWrist);
-    updateDualSphere('leftHipJoint', 'leftHipJoint', j.leftHip);
-    updateDualSphere('rightHipJoint', 'rightHipJoint', j.rightHip);
-    updateDualSphere('leftKneeJoint', 'leftKneeJoint', j.leftKnee);
-    updateDualSphere('rightKneeJoint', 'rightKneeJoint', j.rightKnee);
-    updateDualSphere('leftAnkleJoint', 'leftAnkleJoint', j.leftAnkle);
-    updateDualSphere('rightAnkleJoint', 'rightAnkleJoint', j.rightAnkle);
-    
-    // CLAVICLES - Collar bones from shoulders to neck
-    if (j.leftShoulder && j.rightShoulder) {
-      const neckBase = new THREE.Vector3()
-        .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
-        .multiplyScalar(0.5);
+        .subVectors(j.rightFootIndex.mesh.position, j.rightHeel.mesh.position);
       
-      const leftClavicle = bp.leftClavicle;
-      if (leftClavicle && j.leftShoulder.mesh.visible) {
-        const mid = new THREE.Vector3()
-          .addVectors(neckBase, j.leftShoulder.mesh.position)
-          .multiplyScalar(0.5);
-        leftClavicle.position.copy(mid);
-        const dir = new THREE.Vector3().subVectors(j.leftShoulder.mesh.position, neckBase);
-        if (dir.length() > 0.01) {
-          leftClavicle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-          leftClavicle.scale.y = dir.length() / 0.15;
-          leftClavicle.visible = true;
+      ['rightFootWireframe', 'rightFootSolid'].forEach(name => {
+        const part = avatar.bodyParts[name];
+        if (part && footDir.length() > 0.01) {
+          part.position.copy(footMid);
+          part.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            footDir.normalize()
+          );
+          part.visible = j.rightAnkle.mesh.visible && j.rightFootIndex.mesh.visible;
         }
-      }
-      
-      const rightClavicle = bp.rightClavicle;
-      if (rightClavicle && j.rightShoulder.mesh.visible) {
-        const mid = new THREE.Vector3()
-          .addVectors(neckBase, j.rightShoulder.mesh.position)
-          .multiplyScalar(0.5);
-        rightClavicle.position.copy(mid);
-        const dir = new THREE.Vector3().subVectors(j.rightShoulder.mesh.position, neckBase);
-        if (dir.length() > 0.01) {
-          rightClavicle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-          rightClavicle.scale.y = dir.length() / 0.15;
-          rightClavicle.visible = true;
-        }
-      }
-    }
-    
-    // SPINE SEGMENTS - Distributed along the spine for detailed tracking
-    if (j.nose && j.leftHip && j.rightHip) {
-      const hipCenter = new THREE.Vector3()
-        .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
-        .multiplyScalar(0.5);
-      const shoulderCenter = j.leftShoulder && j.rightShoulder 
-        ? new THREE.Vector3()
-            .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
-            .multiplyScalar(0.5)
-        : j.nose.mesh.position.clone();
-      
-      for (let i = 0; i < 5; i++) {
-        const spine = bp[`spineSegment${i}`];
-        if (spine) {
-          const t = i / 4; // 0 to 1
-          spine.position.lerpVectors(hipCenter, shoulderCenter, t);
-          spine.visible = true;
-        }
-      }
-    }
-    
-    // EYES - Position at eye joints
-    updateDualSphere('leftEyeSphere', 'leftEyeSphere', j.leftEye);
-    updateDualSphere('rightEyeSphere', 'rightEyeSphere', j.rightEye);
-    
-    // EARS - Position at ear joints
-    if (j.leftEar && bp.leftEarMesh) {
-      bp.leftEarMesh.position.copy(j.leftEar.mesh.position);
-      bp.leftEarMesh.visible = j.leftEar.mesh.visible;
-    }
-    if (j.rightEar && bp.rightEarMesh) {
-      bp.rightEarMesh.position.copy(j.rightEar.mesh.position);
-      bp.rightEarMesh.visible = j.rightEar.mesh.visible;
-    }
-    
-    // JAW - Position at mouth center
-    if (j.mouthLeft && j.mouthRight && bp.jaw) {
-      const mouthCenter = new THREE.Vector3()
-        .addVectors(j.mouthLeft.mesh.position, j.mouthRight.mesh.position)
-        .multiplyScalar(0.5);
-      bp.jaw.position.copy(mouthCenter);
-      bp.jaw.visible = j.mouthLeft.mesh.visible && j.mouthRight.mesh.visible;
+      });
     }
   }
 }
