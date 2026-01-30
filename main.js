@@ -39,6 +39,8 @@ window.addEventListener('unhandledrejection', (event) => {
   console.log('3D Avatar created:', avatar);
   avatar.group.visible = true;
   avatar.group.position.set(0, 0, 0);
+  // Flip avatar to correct MediaPipe Y-axis (which points downward)
+  avatar.group.scale.set(1, -1, 1);
   
   // Physics body for avatar
   avatar.physicsBody = {
@@ -262,7 +264,7 @@ window.addEventListener('unhandledrejection', (event) => {
         if (supportFoot) {
           trackedPos = { 
             x: supportFoot.x, 
-            y: supportFoot.y + 1.6, 
+            y: -supportFoot.y + 1.6, 
             z: -supportFoot.z 
           };
           smoothingFactor = 0.85;
@@ -271,7 +273,7 @@ window.addEventListener('unhandledrejection', (event) => {
           if (pelvis) {
             trackedPos = { 
               x: pelvis.x, 
-              y: pelvis.y + 1.6, 
+              y: -pelvis.y + 1.6, 
               z: -pelvis.z 
             };
           }
