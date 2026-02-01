@@ -119,6 +119,64 @@ export async function createRenderer({ onResize, enableVR = true, cameraMode = '
       cameraState.firstPersonPitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, cameraState.firstPersonPitch - e.movementY * sensitivity));
     }
   });
+
+  // Touch controls for mobile devices
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartDistance = 0;
+  let isTouching = false;
+  let isMultiTouch = false;
+  
+  window.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      isTouching = true;
+      isMultiTouch = false;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      isMultiTouch = true;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+    }
+  }, { passive: true });
+  
+  window.addEventListener('touchend', () => {
+    isTouching = false;
+    isMultiTouch = false;
+  }, { passive: true });
+  
+  window.addEventListener('touchmove', (e) => {
+    const sensitivity = 0.005;
+    
+    if (isMultiTouch && e.touches.length === 2) {
+      // Pinch to zoom (orbit mode)
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const delta = touchStartDistance - distance;
+      
+      if (cameraState.mode === 'orbit') {
+        cameraState.orbitDistance = Math.max(0.5, Math.min(20, cameraState.orbitDistance + delta * 0.01));
+      }
+      touchStartDistance = distance;
+    } else if (isTouching && e.touches.length === 1) {
+      // Single finger drag to rotate
+      const deltaX = e.touches[0].clientX - touchStartX;
+      const deltaY = e.touches[0].clientY - touchStartY;
+      
+      if (cameraState.mode === 'orbit') {
+        cameraState.orbitAngleH -= deltaX * sensitivity;
+        cameraState.orbitAngleV = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, cameraState.orbitAngleV - deltaY * sensitivity));
+      } else if (cameraState.mode === 'firstPerson') {
+        cameraState.firstPersonYaw -= deltaX * sensitivity;
+        cameraState.firstPersonPitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, cameraState.firstPersonPitch - deltaY * sensitivity));
+      }
+      
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
   
   // Zoom with mouse wheel (orbit mode)
   window.addEventListener('wheel', (e) => {
