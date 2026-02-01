@@ -17,11 +17,23 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 (async function(){
-  // Initialize renderer
+  // Detect if mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  console.log('[Device] Mobile detected:', isMobile);
+  
+  // Initialize renderer with mobile optimizations
   const { scene, camera, renderer, cameraState, setCameraMode, updateCamera } = await createRenderer({ 
     enableVR: false, 
     cameraMode: 'orbit' 
   });
+  
+  // Apply mobile-specific renderer optimizations
+  if (isMobile) {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // Lower pixel ratio for performance
+    renderer.shadowMap.enabled = false; // Disable shadows on mobile for performance
+    console.log('[Renderer] Mobile optimizations applied');
+  }
+  
   document.body.appendChild(renderer.domElement);
   
   const statusEl = document.getElementById('status');
@@ -164,9 +176,14 @@ window.addEventListener('unhandledrejection', (event) => {
     });
   }
   
-  // Performance mode
+  // Performance mode - enable by default on mobile
   const lowPerfInput = document.getElementById('lowPerf');
   if (lowPerfInput) {
+    if (isMobile) {
+      lowPerfInput.checked = true;
+      tracking.applyPerf(true);
+      console.log('[Tracking] Low performance mode enabled for mobile');
+    }
     lowPerfInput.addEventListener('change', (e) => {
       tracking.applyPerf(e.target.checked);
     });
@@ -190,6 +207,10 @@ window.addEventListener('unhandledrejection', (event) => {
   // Tracking data
   let latestPose = null;
   const latestPosePerCamera = [];
+  
+  // Physics tracking variables
+  let trackedPos = null;
+  let smoothingFactor = 0.5;
 
   // Tracking event handler
   function handleTrackingEvent(ev) {
@@ -248,7 +269,97 @@ window.addEventListener('unhandledrejection', (event) => {
   document.body.appendChild(cameraModeSelect);
   cameraModeSelect.addEventListener('change', (e) => {
     setCameraMode(e.target.value);
+    // Show/hide mobile controls based on camera mode
+    if (isMobile) {
+      const mobileControls = document.getElementById('mobileControls');
+      const jumpButton = document.getElementById('jumpButton');
+      if (e.target.value === 'firstPerson') {
+        if (mobileControls) mobileControls.classList.add('active');
+        if (jumpButton) jumpButton.style.display = 'flex';
+      } else {
+        if (mobileControls) mobileControls.classList.remove('active');
+        if (jumpButton) jumpButton.style.display = 'none';
+      }
+    }
   });
+
+  // Mobile virtual joystick controls
+  if (isMobile) {
+    const joystick = document.getElementById('joystick');
+    const joystickKnob = joystick?.querySelector('.joystick-knob');
+    const jumpButton = document.getElementById('jumpButton');
+    
+    if (joystick && joystickKnob) {
+      let joystickActive = false;
+      let joystickCenter = { x: 0, y: 0 };
+      
+      joystick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        joystickActive = true;
+        const rect = joystick.getBoundingClientRect();
+        joystickCenter = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+      });
+      
+      joystick.addEventListener('touchmove', (e) => {
+        if (!joystickActive) return;
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - joystickCenter.x;
+        const deltaY = touch.clientY - joystickCenter.y;
+        
+        // Limit movement to joystick radius
+        const maxDistance = 35;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const limitedDeltaX = distance > maxDistance ? (deltaX / distance) * maxDistance : deltaX;
+        const limitedDeltaY = distance > maxDistance ? (deltaY / distance) * maxDistance : deltaY;
+        
+        // Update knob position
+        joystickKnob.style.transform = `translate(calc(-50% + ${limitedDeltaX}px), calc(-50% + ${limitedDeltaY}px))`;
+        
+        // Update camera state for first person mode
+        if (cameraState.mode === 'firstPerson') {
+          const normalizedX = limitedDeltaX / maxDistance;
+          const normalizedY = limitedDeltaY / maxDistance;
+          
+          cameraState.keys.w = normalizedY < -0.3;
+          cameraState.keys.s = normalizedY > 0.3;
+          cameraState.keys.a = normalizedX < -0.3;
+          cameraState.keys.d = normalizedX > 0.3;
+        }
+      });
+      
+      const resetJoystick = () => {
+        joystickActive = false;
+        joystickKnob.style.transform = 'translate(-50%, -50%)';
+        cameraState.keys.w = false;
+        cameraState.keys.s = false;
+        cameraState.keys.a = false;
+        cameraState.keys.d = false;
+      };
+      
+      joystick.addEventListener('touchend', resetJoystick);
+      joystick.addEventListener('touchcancel', resetJoystick);
+    }
+    
+    // Jump button
+    if (jumpButton) {
+      jumpButton.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        cameraState.keys.space = true;
+      });
+      
+      jumpButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        cameraState.keys.space = false;
+      });
+    }
+    
+    console.log('[Mobile] Virtual controls initialized');
+  }
 
   // Render loop
   let frameCount = 0;
