@@ -409,21 +409,13 @@ window.addEventListener('unhandledrejection', (event) => {
           return new THREE.Vector3(x, -y, -z);
         });
         
-        // Center avatar at pelvis/hip position for proper relative positioning
-        if (latestPose.world && latestPose.world.length > 24) {
-          const leftHip = latestPose.world[23];
-          const rightHip = latestPose.world[24];
-          
-          if (leftHip && rightHip) {
-            const hipCenterX = (leftHip.x + rightHip.x) / 2;
-            const hipCenterY = -(leftHip.y + rightHip.y) / 2; // Flip Y
-            const hipCenterZ = -(leftHip.z + rightHip.z) / 2; // Flip Z
-            
-            avatar.group.position.lerp(
-              new THREE.Vector3(hipCenterX, hipCenterY, hipCenterZ),
-              0.2 // Smooth centering
-            );
-          }
+        // Update avatar group position for walking/jumping movements
+        if (trackedPos) {
+          avatar.group.position.lerp(
+            new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
+            0.15 // Smooth movement
+          );
+          console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
         }
       }
       // Fallback to screen landmarks (2D tracking)
@@ -468,24 +460,13 @@ window.addEventListener('unhandledrejection', (event) => {
           return v;
         });
         
-        // Center avatar at pelvis/hip position for proper relative positioning
-        if (latestPose.landmarks && latestPose.landmarks.length > 24) {
-          const leftHip = latestPose.landmarks[23];
-          const rightHip = latestPose.landmarks[24];
-          
-          if (leftHip && rightHip) {
-            const hipCenterX = (leftHip.x + rightHip.x) / 2;
-            const hipCenterY = (leftHip.y + rightHip.y) / 2;
-            const hipCenterZ = (leftHip.z + rightHip.z) / 2;
-            
-            const ndcX = (hipCenterX - 0.5) * 2;
-            const ndcY = -(hipCenterY - 0.5) * 2;
-            const ndcZ = -0.3 - (hipCenterZ * 1.6);
-            const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
-            v.unproject(camera);
-            
-            avatar.group.position.lerp(v, 0.2);
-          }
+        // Update avatar group position for walking/jumping movements
+        if (trackedPos) {
+          avatar.group.position.lerp(
+            new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
+            0.15 // Smooth movement
+          );
+          console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
         }
       }
     }
