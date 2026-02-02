@@ -51,8 +51,8 @@ window.addEventListener('unhandledrejection', (event) => {
   console.log('3D Avatar created:', avatar);
   avatar.group.visible = true;
   avatar.group.position.set(0, 0, 0);
-  // Flip avatar to correct MediaPipe Y-axis (which points downward)
-  avatar.group.scale.set(1, -1, 1);
+  // Don't flip avatar - handle coordinate conversion in landmarkToWorld function instead
+  avatar.group.scale.set(1, 1, 1);
   
   // Physics body for avatar
   avatar.physicsBody = {
@@ -403,11 +403,20 @@ window.addEventListener('unhandledrejection', (event) => {
         }
         
         updateAvatarFromPose(avatar, latestPose.world, (x, y, z, scale) => {
-          // MediaPipe world coordinates: x=right, y=up, z=forward (toward camera)
+          // MediaPipe world coordinates: x=right, y=down (inverted), z=forward (toward camera)
           // THREE.js: x=right, y=up, z=backward (away from camera)
-          // Flip Z to convert from camera-forward to camera-backward
-          return new THREE.Vector3(x, y, -z);
+          // Flip Y and Z to correct orientation
+          return new THREE.Vector3(x, -y, -z);
         });
+        
+        // Update avatar group position for walking/jumping movements
+        if (trackedPos) {
+          avatar.group.position.lerp(
+            new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
+            0.15 // Smooth movement
+          );
+          console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
+        }
       }
       // Fallback to screen landmarks (2D tracking)
       else if (latestPose.landmarks) {
@@ -450,6 +459,15 @@ window.addEventListener('unhandledrejection', (event) => {
           v.unproject(camera);
           return v;
         });
+        
+        // Update avatar group position for walking/jumping movements
+        if (trackedPos) {
+          avatar.group.position.lerp(
+            new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
+            0.15 // Smooth movement
+          );
+          console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
+        }
       }
     }
   }, { updateCamera });
