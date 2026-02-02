@@ -559,8 +559,6 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       .subVectors(jointB.mesh.position, jointA.mesh.position);
     const length = direction.length();
     
-    console.log(`[AVATAR] ${wireframeName}: length=${length.toFixed(4)}, mid=(${mid.x.toFixed(2)},${mid.y.toFixed(2)},${mid.z.toFixed(2)})`);
-    
     if (length > 0.01) {
       [partWire, partSolid].forEach(part => {
         if (!part) return;
