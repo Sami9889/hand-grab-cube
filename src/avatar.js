@@ -50,6 +50,24 @@ export function createAvatar(scene) {
     'leftFootIndex', 'rightFootIndex'
   ];
   
+  // Additional finger joint names for detailed hand tracking (if hand landmarks available)
+  const fingerJointNames = {
+    left: [
+      'leftThumbCMC', 'leftThumbMCP', 'leftThumbIP', 'leftThumbTip',
+      'leftIndexMCP', 'leftIndexPIP', 'leftIndexDIP', 'leftIndexTip',
+      'leftMiddleMCP', 'leftMiddlePIP', 'leftMiddleDIP', 'leftMiddleTip',
+      'leftRingMCP', 'leftRingPIP', 'leftRingDIP', 'leftRingTip',
+      'leftPinkyMCP', 'leftPinkyPIP', 'leftPinkyDIP', 'leftPinkyTip'
+    ],
+    right: [
+      'rightThumbCMC', 'rightThumbMCP', 'rightThumbIP', 'rightThumbTip',
+      'rightIndexMCP', 'rightIndexPIP', 'rightIndexDIP', 'rightIndexTip',
+      'rightMiddleMCP', 'rightMiddlePIP', 'rightMiddleDIP', 'rightMiddleTip',
+      'rightRingMCP', 'rightRingPIP', 'rightRingDIP', 'rightRingTip',
+      'rightPinkyMCP', 'rightPinkyPIP', 'rightPinkyDIP', 'rightPinkyTip'
+    ]
+  };
+  
   // Create glowing spheres for all 33 joints
   jointNames.forEach((name, idx) => {
     try {
@@ -68,6 +86,36 @@ export function createAvatar(scene) {
     } catch (err) {
       if (console && console.error) {
         console.error(`[AVATAR] Error creating joint ${name}:`, err);
+      }
+    }
+  });
+  
+  // Create smaller spheres for finger joints (for detailed hand tracking)
+  const fingerJointMat = new THREE.MeshStandardMaterial({ 
+    color: 0xff6b00,  // Orange for finger joints
+    emissive: 0xff3300,
+    emissiveIntensity: 0.4,
+    transparent: true,
+    opacity: 0.85
+  });
+  
+  [...fingerJointNames.left, ...fingerJointNames.right].forEach((name) => {
+    try {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.015, 12, 12), // Smaller spheres for fingers
+        fingerJointMat.clone()
+      );
+      sphere.visible = false; // Hidden by default until hand tracking is active
+      sphere.castShadow = true;
+      group.add(sphere);
+      joints[name] = { 
+        mesh: sphere, 
+        pos: new THREE.Vector3(),
+        isFinger: true
+      };
+    } catch (err) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error creating finger joint ${name}:`, err);
       }
     }
   });
@@ -99,6 +147,22 @@ export function createAvatar(scene) {
     ['rightAnkle', 'rightHeel'], ['rightAnkle', 'rightFootIndex'], ['rightHeel', 'rightFootIndex']
   ];
   
+  // Add finger connections for detailed hand tracking
+  const fingerConnections = [
+    // Left hand fingers
+    ['leftWrist', 'leftThumbCMC'], ['leftThumbCMC', 'leftThumbMCP'], ['leftThumbMCP', 'leftThumbIP'], ['leftThumbIP', 'leftThumbTip'],
+    ['leftWrist', 'leftIndexMCP'], ['leftIndexMCP', 'leftIndexPIP'], ['leftIndexPIP', 'leftIndexDIP'], ['leftIndexDIP', 'leftIndexTip'],
+    ['leftWrist', 'leftMiddleMCP'], ['leftMiddleMCP', 'leftMiddlePIP'], ['leftMiddlePIP', 'leftMiddleDIP'], ['leftMiddleDIP', 'leftMiddleTip'],
+    ['leftWrist', 'leftRingMCP'], ['leftRingMCP', 'leftRingPIP'], ['leftRingPIP', 'leftRingDIP'], ['leftRingDIP', 'leftRingTip'],
+    ['leftWrist', 'leftPinkyMCP'], ['leftPinkyMCP', 'leftPinkyPIP'], ['leftPinkyPIP', 'leftPinkyDIP'], ['leftPinkyDIP', 'leftPinkyTip'],
+    // Right hand fingers
+    ['rightWrist', 'rightThumbCMC'], ['rightThumbCMC', 'rightThumbMCP'], ['rightThumbMCP', 'rightThumbIP'], ['rightThumbIP', 'rightThumbTip'],
+    ['rightWrist', 'rightIndexMCP'], ['rightIndexMCP', 'rightIndexPIP'], ['rightIndexPIP', 'rightIndexDIP'], ['rightIndexDIP', 'rightIndexTip'],
+    ['rightWrist', 'rightMiddleMCP'], ['rightMiddleMCP', 'rightMiddlePIP'], ['rightMiddlePIP', 'rightMiddleDIP'], ['rightMiddleDIP', 'rightMiddleTip'],
+    ['rightWrist', 'rightRingMCP'], ['rightRingMCP', 'rightRingPIP'], ['rightRingPIP', 'rightRingDIP'], ['rightRingDIP', 'rightRingTip'],
+    ['rightWrist', 'rightPinkyMCP'], ['rightPinkyMCP', 'rightPinkyPIP'], ['rightPinkyPIP', 'rightPinkyDIP'], ['rightPinkyDIP', 'rightPinkyTip']
+  ];
+  
   // Create thin glowing lines for connections
   skeletonConnections.forEach(([a, b]) => {
     try {
@@ -117,6 +181,29 @@ export function createAvatar(scene) {
     } catch (err) {
       if (console && console.error) {
         console.error(`[AVATAR] Error creating connection between ${a} and ${b}:`, err);
+      }
+    }
+  });
+  
+  // Create finger connection lines (thinner, orange color)
+  fingerConnections.forEach(([a, b]) => {
+    try {
+      const lineMat = new THREE.LineBasicMaterial({ 
+        color: 0xff6b00,  // Orange for fingers
+        transparent: true, 
+        opacity: 0.7,
+        linewidth: 1
+      });
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(6);
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const line = new THREE.Line(geometry, lineMat);
+      line.visible = false; // Hidden by default until hand tracking is active
+      group.add(line);
+      connections.push({ line, a, b, isFinger: true });
+    } catch (err) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error creating finger connection between ${a} and ${b}:`, err);
       }
     }
   });
@@ -720,4 +807,83 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       }
     }
   }
+}
+
+// Export function to update hand landmarks from MediaPipe Hands
+export function updateAvatarHands(avatar, handLandmarks, handedness, landmarkToWorld) {
+  if (!avatar || !avatar.joints) {
+    console.warn('[AVATAR] updateAvatarHands called with invalid avatar');
+    return;
+  }
+  
+  if (!handLandmarks || !Array.isArray(handLandmarks) || handLandmarks.length !== 21) {
+    console.warn('[AVATAR] Invalid hand landmarks');
+    return;
+  }
+  
+  // Determine if left or right hand
+  const isLeft = handedness && handedness.toLowerCase().includes('left');
+  const prefix = isLeft ? 'left' : 'right';
+  
+  // MediaPipe hand landmark indices
+  const handMap = [
+    'Wrist', 'ThumbCMC', 'ThumbMCP', 'ThumbIP', 'ThumbTip',
+    'IndexMCP', 'IndexPIP', 'IndexDIP', 'IndexTip',
+    'MiddleMCP', 'MiddlePIP', 'MiddleDIP', 'MiddleTip',
+    'RingMCP', 'RingPIP', 'RingDIP', 'RingTip',
+    'PinkyMCP', 'PinkyPIP', 'PinkyDIP', 'PinkyTip'
+  ];
+  
+  // Update finger joint positions
+  handLandmarks.forEach((lm, idx) => {
+    if (idx === 0) return; // Skip wrist (already tracked by pose)
+    
+    const jointName = prefix + handMap[idx];
+    const joint = avatar.joints[jointName];
+    
+    if (!joint) return;
+    
+    try {
+      const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
+      if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
+        return;
+      }
+      
+      joint.pos.lerp(worldPos, 0.7); // Smooth finger movement
+      joint.mesh.position.copy(joint.pos);
+      joint.mesh.visible = true;
+    } catch (e) {
+      console.error(`[AVATAR] Error updating finger joint ${jointName}:`, e);
+    }
+  });
+  
+  // Show finger connections
+  if (avatar.connections) {
+    avatar.connections.forEach(conn => {
+      if (conn.isFinger) {
+        const jointA = avatar.joints[conn.a];
+        const jointB = avatar.joints[conn.b];
+        
+        // Check if this connection belongs to the current hand
+        if (!conn.a.startsWith(prefix) && !conn.b.startsWith(prefix)) {
+          return;
+        }
+        
+        if (jointA && jointB && jointA.mesh && jointB.mesh && 
+            jointA.mesh.visible && jointB.mesh.visible) {
+          const positions = conn.line.geometry.attributes.position.array;
+          positions[0] = jointA.mesh.position.x;
+          positions[1] = jointA.mesh.position.y;
+          positions[2] = jointA.mesh.position.z;
+          positions[3] = jointB.mesh.position.x;
+          positions[4] = jointB.mesh.position.y;
+          positions[5] = jointB.mesh.position.z;
+          conn.line.geometry.attributes.position.needsUpdate = true;
+          conn.line.visible = true;
+        }
+      }
+    });
+  }
+  
+  console.log(`[AVATAR] Updated ${prefix} hand with ${handLandmarks.length} finger landmarks`);
 }
