@@ -501,7 +501,7 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partSolid = avatar.bodyParts[solidName];
     
     // Enhanced validation with warnings for debugging
-    if (!joint) 
+    if (!joint) {
       if (console && console.warn) {
         console.warn(`[AVATAR] Missing joint for ${wireframeName}/${solidName}`);
       }
