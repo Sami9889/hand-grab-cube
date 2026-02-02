@@ -376,22 +376,32 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
-    if (!jointA || !jointB || !partWire || !partSolid) return;
-    if (!jointA.mesh.visible || !jointB.mesh.visible) {
+    // Enhanced validation with warnings for debugging
+    if (!jointA || !jointB) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing joints for ${wireframeName}/${solidName}`);
+      }
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
     }
     
-    const posA = jointA.mesh.position;
-    const posB = jointB.mesh.position;
+    if (!partWire || !partSolid) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`);
+      }
+      return;
+    }
     
-    // Position at midpoint
-    const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
-    
-    // Orient along line between joints
-    const direction = new THREE.Vector3().subVectors(posB, posA);
-    const length = direction.length();
+    // Check if joints have valid mesh and position properties
+    if (!jointA.mesh || !jointB.mesh || !jointA.mesh.position || !jointB.mesh.position) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Invalid joint mesh structure for ${wireframeName}/${solidName}`);
+      }
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
     
     if (length > 0.01) {
       [partWire, partSolid].forEach(part => {
@@ -426,6 +436,7 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     } else {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
+      return;
     }
   }
   
@@ -434,18 +445,54 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
-    if (!joint || !joint.mesh.visible || !partWire || !partSolid) {
+    // Enhanced validation with warnings for debugging
+    if (!joint) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing joint for ${wireframeName}/${solidName}`);
+      }
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
     }
     
-    [partWire, partSolid].forEach(part => {
-      if (part) {
-        part.position.copy(joint.mesh.position);
-        part.visible = true;
+    if (!partWire || !partSolid) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`);
       }
-    });
+      return;
+    }
+    
+    // Check if joint has valid mesh and position properties
+    if (!joint.mesh || !joint.mesh.position) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Invalid joint mesh structure for ${wireframeName}/${solidName}`);
+      }
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
+    
+    if (!joint.mesh.visible) {
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
+    
+    try {
+      [partWire, partSolid].forEach(part => {
+        if (part) {
+          part.position.copy(joint.mesh.position);
+          part.visible = true;
+        }
+      });
+    } catch (error) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error updating dual sphere ${wireframeName}/${solidName}:`, error);
+      }
+      // Hide parts on error to prevent visual glitches
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+    }
   }
   
   // Update high-detail grid body parts with dual-layer rendering
