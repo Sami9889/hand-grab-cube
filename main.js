@@ -51,8 +51,8 @@ window.addEventListener('unhandledrejection', (event) => {
   console.log('3D Avatar created:', avatar);
   avatar.group.visible = true;
   avatar.group.position.set(0, 0, 0);
-  // Flip avatar to correct MediaPipe Y-axis (which points downward)
-  avatar.group.scale.set(1, -1, 1);
+  // Don't flip avatar - handle coordinate conversion in landmarkToWorld function instead
+  avatar.group.scale.set(1, 1, 1);
   
   // Physics body for avatar
   avatar.physicsBody = {
@@ -403,11 +403,28 @@ window.addEventListener('unhandledrejection', (event) => {
         }
         
         updateAvatarFromPose(avatar, latestPose.world, (x, y, z, scale) => {
-          // MediaPipe world coordinates: x=right, y=up, z=forward (toward camera)
+          // MediaPipe world coordinates: x=right, y=down (inverted), z=forward (toward camera)
           // THREE.js: x=right, y=up, z=backward (away from camera)
-          // Flip Z to convert from camera-forward to camera-backward
-          return new THREE.Vector3(x, y, -z);
+          // Flip Y and Z to correct orientation
+          return new THREE.Vector3(x, -y, -z);
         });
+        
+        // Center avatar at pelvis/hip position for proper relative positioning
+        if (latestPose.world && latestPose.world.length > 24) {
+          const leftHip = latestPose.world[23];
+          const rightHip = latestPose.world[24];
+          
+          if (leftHip && rightHip) {
+            const hipCenterX = (leftHip.x + rightHip.x) / 2;
+            const hipCenterY = -(leftHip.y + rightHip.y) / 2; // Flip Y
+            const hipCenterZ = -(leftHip.z + rightHip.z) / 2; // Flip Z
+            
+            avatar.group.position.lerp(
+              new THREE.Vector3(hipCenterX, hipCenterY, hipCenterZ),
+              0.2 // Smooth centering
+            );
+          }
+        }
       }
       // Fallback to screen landmarks (2D tracking)
       else if (latestPose.landmarks) {
@@ -450,6 +467,26 @@ window.addEventListener('unhandledrejection', (event) => {
           v.unproject(camera);
           return v;
         });
+        
+        // Center avatar at pelvis/hip position for proper relative positioning
+        if (latestPose.landmarks && latestPose.landmarks.length > 24) {
+          const leftHip = latestPose.landmarks[23];
+          const rightHip = latestPose.landmarks[24];
+          
+          if (leftHip && rightHip) {
+            const hipCenterX = (leftHip.x + rightHip.x) / 2;
+            const hipCenterY = (leftHip.y + rightHip.y) / 2;
+            const hipCenterZ = (leftHip.z + rightHip.z) / 2;
+            
+            const ndcX = (hipCenterX - 0.5) * 2;
+            const ndcY = -(hipCenterY - 0.5) * 2;
+            const ndcZ = -0.3 - (hipCenterZ * 1.6);
+            const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
+            v.unproject(camera);
+            
+            avatar.group.position.lerp(v, 0.2);
+          }
+        }
       }
     }
   }, { updateCamera });

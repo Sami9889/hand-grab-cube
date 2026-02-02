@@ -50,6 +50,24 @@ export function createAvatar(scene) {
     'leftFootIndex', 'rightFootIndex'
   ];
   
+  // Additional finger joint names for detailed hand tracking (if hand landmarks available)
+  const fingerJointNames = {
+    left: [
+      'leftThumbCMC', 'leftThumbMCP', 'leftThumbIP', 'leftThumbTip',
+      'leftIndexMCP', 'leftIndexPIP', 'leftIndexDIP', 'leftIndexTip',
+      'leftMiddleMCP', 'leftMiddlePIP', 'leftMiddleDIP', 'leftMiddleTip',
+      'leftRingMCP', 'leftRingPIP', 'leftRingDIP', 'leftRingTip',
+      'leftPinkyMCP', 'leftPinkyPIP', 'leftPinkyDIP', 'leftPinkyTip'
+    ],
+    right: [
+      'rightThumbCMC', 'rightThumbMCP', 'rightThumbIP', 'rightThumbTip',
+      'rightIndexMCP', 'rightIndexPIP', 'rightIndexDIP', 'rightIndexTip',
+      'rightMiddleMCP', 'rightMiddlePIP', 'rightMiddleDIP', 'rightMiddleTip',
+      'rightRingMCP', 'rightRingPIP', 'rightRingDIP', 'rightRingTip',
+      'rightPinkyMCP', 'rightPinkyPIP', 'rightPinkyDIP', 'rightPinkyTip'
+    ]
+  };
+  
   // Create glowing spheres for all 33 joints
   jointNames.forEach((name, idx) => {
     try {
@@ -68,6 +86,36 @@ export function createAvatar(scene) {
     } catch (err) {
       if (console && console.error) {
         console.error(`[AVATAR] Error creating joint ${name}:`, err);
+      }
+    }
+  });
+  
+  // Create smaller spheres for finger joints (for detailed hand tracking)
+  const fingerJointMat = new THREE.MeshStandardMaterial({ 
+    color: 0xff6b00,  // Orange for finger joints
+    emissive: 0xff3300,
+    emissiveIntensity: 0.4,
+    transparent: true,
+    opacity: 0.85
+  });
+  
+  [...fingerJointNames.left, ...fingerJointNames.right].forEach((name) => {
+    try {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.015, 12, 12), // Smaller spheres for fingers
+        fingerJointMat.clone()
+      );
+      sphere.visible = false; // Hidden by default until hand tracking is active
+      sphere.castShadow = true;
+      group.add(sphere);
+      joints[name] = { 
+        mesh: sphere, 
+        pos: new THREE.Vector3(),
+        isFinger: true
+      };
+    } catch (err) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error creating finger joint ${name}:`, err);
       }
     }
   });
@@ -99,6 +147,22 @@ export function createAvatar(scene) {
     ['rightAnkle', 'rightHeel'], ['rightAnkle', 'rightFootIndex'], ['rightHeel', 'rightFootIndex']
   ];
   
+  // Add finger connections for detailed hand tracking
+  const fingerConnections = [
+    // Left hand fingers
+    ['leftWrist', 'leftThumbCMC'], ['leftThumbCMC', 'leftThumbMCP'], ['leftThumbMCP', 'leftThumbIP'], ['leftThumbIP', 'leftThumbTip'],
+    ['leftWrist', 'leftIndexMCP'], ['leftIndexMCP', 'leftIndexPIP'], ['leftIndexPIP', 'leftIndexDIP'], ['leftIndexDIP', 'leftIndexTip'],
+    ['leftWrist', 'leftMiddleMCP'], ['leftMiddleMCP', 'leftMiddlePIP'], ['leftMiddlePIP', 'leftMiddleDIP'], ['leftMiddleDIP', 'leftMiddleTip'],
+    ['leftWrist', 'leftRingMCP'], ['leftRingMCP', 'leftRingPIP'], ['leftRingPIP', 'leftRingDIP'], ['leftRingDIP', 'leftRingTip'],
+    ['leftWrist', 'leftPinkyMCP'], ['leftPinkyMCP', 'leftPinkyPIP'], ['leftPinkyPIP', 'leftPinkyDIP'], ['leftPinkyDIP', 'leftPinkyTip'],
+    // Right hand fingers
+    ['rightWrist', 'rightThumbCMC'], ['rightThumbCMC', 'rightThumbMCP'], ['rightThumbMCP', 'rightThumbIP'], ['rightThumbIP', 'rightThumbTip'],
+    ['rightWrist', 'rightIndexMCP'], ['rightIndexMCP', 'rightIndexPIP'], ['rightIndexPIP', 'rightIndexDIP'], ['rightIndexDIP', 'rightIndexTip'],
+    ['rightWrist', 'rightMiddleMCP'], ['rightMiddleMCP', 'rightMiddlePIP'], ['rightMiddlePIP', 'rightMiddleDIP'], ['rightMiddleDIP', 'rightMiddleTip'],
+    ['rightWrist', 'rightRingMCP'], ['rightRingMCP', 'rightRingPIP'], ['rightRingPIP', 'rightRingDIP'], ['rightRingDIP', 'rightRingTip'],
+    ['rightWrist', 'rightPinkyMCP'], ['rightPinkyMCP', 'rightPinkyPIP'], ['rightPinkyPIP', 'rightPinkyDIP'], ['rightPinkyDIP', 'rightPinkyTip']
+  ];
+  
   // Create thin glowing lines for connections
   skeletonConnections.forEach(([a, b]) => {
     try {
@@ -121,6 +185,29 @@ export function createAvatar(scene) {
     }
   });
   
+  // Create finger connection lines (thinner, orange color)
+  fingerConnections.forEach(([a, b]) => {
+    try {
+      const lineMat = new THREE.LineBasicMaterial({ 
+        color: 0xff6b00,  // Orange for fingers
+        transparent: true, 
+        opacity: 0.7,
+        linewidth: 1
+      });
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(6);
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const line = new THREE.Line(geometry, lineMat);
+      line.visible = false; // Hidden by default until hand tracking is active
+      group.add(line);
+      connections.push({ line, a, b, isFinger: true });
+    } catch (err) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error creating finger connection between ${a} and ${b}:`, err);
+      }
+    }
+  });
+  
   // Create HIGH-DETAIL grid mesh body parts (32+ segments for grid-like appearance)
   
   // HEAD - High-poly sphere with dual-layer wireframe + solid
@@ -129,6 +216,7 @@ export function createAvatar(scene) {
     gridMat.clone()
   );
   headWireframe.castShadow = true;
+  headWireframe.visible = true;
   group.add(headWireframe);
   bodyParts.headWireframe = headWireframe;
   
@@ -136,6 +224,7 @@ export function createAvatar(scene) {
     new THREE.SphereGeometry(0.12, 32, 32),
     solidGridMat.clone()
   );
+  headSolid.visible = true;
   group.add(headSolid);
   bodyParts.headSolid = headSolid;
   
@@ -191,12 +280,14 @@ export function createAvatar(scene) {
       gridMat.clone()
     );
     wireframe.castShadow = true;
+    wireframe.visible = true; // Initialize as visible
     group.add(wireframe);
     
     const solid = new THREE.Mesh(
       new THREE.CylinderGeometry(radiusTop * 0.9, radiusBottom * 0.9, height, 16, 16),
       solidGridMat.clone()
     );
+    solid.visible = true; // Initialize as visible
     group.add(solid);
     
     bodyParts[name + 'Wireframe'] = wireframe;
@@ -353,10 +444,26 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     rightFootIndex: 32
   };
   
+  // Calculate hip center for relative positioning
+  let hipCenter = null;
+  const leftHipLm = landmarks[map.leftHip];
+  const rightHipLm = landmarks[map.rightHip];
+  
+  if (leftHipLm && rightHipLm) {
+    const leftHipWorld = landmarkToWorld(leftHipLm.x, leftHipLm.y, leftHipLm.z);
+    const rightHipWorld = landmarkToWorld(rightHipLm.x, rightHipLm.y, rightHipLm.z);
+    
+    if (leftHipWorld && rightHipWorld) {
+      hipCenter = new THREE.Vector3()
+        .addVectors(leftHipWorld, rightHipWorld)
+        .multiplyScalar(0.5);
+    }
+  }
+  
   // Update all 33 joint positions with smooth interpolation
+  // Position joints RELATIVE to avatar group origin (not absolute world space)
   for (const [name, idx] of Object.entries(map)) {
     if (!landmarks[idx] || !avatar.joints[name]) {
-      console.log(`[AVATAR] Missing landmark or joint for ${name} (idx: ${idx})`);
       continue;
     }
     
@@ -365,7 +472,6 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     
     // Check visibility (if available)
     if (lm.visibility !== undefined && lm.visibility < 0.3) {
-      console.log(`[AVATAR] Low visibility for ${name}: ${lm.visibility}`);
       joint.mesh.visible = false;
       continue;
     }
@@ -378,11 +484,16 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
       if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
-        console.error(`[AVATAR] Invalid world position for ${name}:`, worldPos);
         continue;
       }
       
-      joint.pos.lerp(worldPos, avatar.smoothFactor);
+      // Position relative to hip center for proper leg crossing, etc.
+      let relativePos = worldPos;
+      if (hipCenter) {
+        relativePos = worldPos.clone().sub(hipCenter);
+      }
+      
+      joint.pos.lerp(relativePos, avatar.smoothFactor);
       joint.mesh.position.copy(joint.pos);
       joint.mesh.visible = (lm.visibility === undefined || lm.visibility > 0.3);
     } catch (e) {
@@ -431,10 +542,12 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
+    console.log(`[AVATAR] updateDualBodyPart called for ${wireframeName}/${solidName}`);
+    
     // Enhanced validation with warnings for debugging
     if (!jointA || !jointB) {
       if (console && console.warn) {
-        console.warn(`[AVATAR] Missing joints for ${wireframeName}/${solidName}`);
+        console.warn(`[AVATAR] Missing joints for ${wireframeName}/${solidName}`, jointA, jointB);
       }
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
@@ -443,7 +556,7 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     
     if (!partWire || !partSolid) {
       if (console && console.warn) {
-        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`);
+        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`, partWire, partSolid);
       }
       return;
     }
@@ -457,6 +570,16 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       if (partSolid) partSolid.visible = false;
       return;
     }
+    
+    // Calculate mid point, direction, and length
+    const mid = new THREE.Vector3()
+      .addVectors(jointA.mesh.position, jointB.mesh.position)
+      .multiplyScalar(0.5);
+    const direction = new THREE.Vector3()
+      .subVectors(jointB.mesh.position, jointA.mesh.position);
+    const length = direction.length();
+    
+    console.log(`[AVATAR] ${wireframeName}: length=${length.toFixed(4)}, mid=(${mid.x.toFixed(2)},${mid.y.toFixed(2)},${mid.z.toFixed(2)})`);
     
     if (length > 0.01) {
       [partWire, partSolid].forEach(part => {
@@ -487,8 +610,10 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
         }
         
         part.visible = true;
+        console.log(`[AVATAR] ${wireframeName}: SET VISIBLE = true`);
       });
     } else {
+      console.log(`[AVATAR] ${wireframeName}: length too small, hiding parts`);
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
@@ -501,7 +626,7 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partSolid = avatar.bodyParts[solidName];
     
     // Enhanced validation with warnings for debugging
-    if (!joint) 
+    if (!joint) {
       if (console && console.warn) {
         console.warn(`[AVATAR] Missing joint for ${wireframeName}/${solidName}`);
       }
@@ -704,4 +829,83 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       }
     }
   }
+}
+
+// Export function to update hand landmarks from MediaPipe Hands
+export function updateAvatarHands(avatar, handLandmarks, handedness, landmarkToWorld) {
+  if (!avatar || !avatar.joints) {
+    console.warn('[AVATAR] updateAvatarHands called with invalid avatar');
+    return;
+  }
+  
+  if (!handLandmarks || !Array.isArray(handLandmarks) || handLandmarks.length !== 21) {
+    console.warn('[AVATAR] Invalid hand landmarks');
+    return;
+  }
+  
+  // Determine if left or right hand
+  const isLeft = handedness && handedness.toLowerCase().includes('left');
+  const prefix = isLeft ? 'left' : 'right';
+  
+  // MediaPipe hand landmark indices
+  const handMap = [
+    'Wrist', 'ThumbCMC', 'ThumbMCP', 'ThumbIP', 'ThumbTip',
+    'IndexMCP', 'IndexPIP', 'IndexDIP', 'IndexTip',
+    'MiddleMCP', 'MiddlePIP', 'MiddleDIP', 'MiddleTip',
+    'RingMCP', 'RingPIP', 'RingDIP', 'RingTip',
+    'PinkyMCP', 'PinkyPIP', 'PinkyDIP', 'PinkyTip'
+  ];
+  
+  // Update finger joint positions
+  handLandmarks.forEach((lm, idx) => {
+    if (idx === 0) return; // Skip wrist (already tracked by pose)
+    
+    const jointName = prefix + handMap[idx];
+    const joint = avatar.joints[jointName];
+    
+    if (!joint) return;
+    
+    try {
+      const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
+      if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
+        return;
+      }
+      
+      joint.pos.lerp(worldPos, 0.7); // Smooth finger movement
+      joint.mesh.position.copy(joint.pos);
+      joint.mesh.visible = true;
+    } catch (e) {
+      console.error(`[AVATAR] Error updating finger joint ${jointName}:`, e);
+    }
+  });
+  
+  // Show finger connections
+  if (avatar.connections) {
+    avatar.connections.forEach(conn => {
+      if (conn.isFinger) {
+        const jointA = avatar.joints[conn.a];
+        const jointB = avatar.joints[conn.b];
+        
+        // Check if this connection belongs to the current hand
+        if (!conn.a.startsWith(prefix) && !conn.b.startsWith(prefix)) {
+          return;
+        }
+        
+        if (jointA && jointB && jointA.mesh && jointB.mesh && 
+            jointA.mesh.visible && jointB.mesh.visible) {
+          const positions = conn.line.geometry.attributes.position.array;
+          positions[0] = jointA.mesh.position.x;
+          positions[1] = jointA.mesh.position.y;
+          positions[2] = jointA.mesh.position.z;
+          positions[3] = jointB.mesh.position.x;
+          positions[4] = jointB.mesh.position.y;
+          positions[5] = jointB.mesh.position.z;
+          conn.line.geometry.attributes.position.needsUpdate = true;
+          conn.line.visible = true;
+        }
+      }
+    });
+  }
+  
+  console.log(`[AVATAR] Updated ${prefix} hand with ${handLandmarks.length} finger landmarks`);
 }
