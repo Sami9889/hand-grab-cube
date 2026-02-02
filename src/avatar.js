@@ -275,7 +275,32 @@ export function createAvatar(scene) {
 }
 
 export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
-  if (!avatar || !landmarks || landmarks.length === 0) {
+  // Comprehensive input validation
+  if (!avatar) {
+    if (console && console.warn) {
+      console.warn('[AVATAR] updateAvatarFromPose called with null/undefined avatar');
+    }
+    return;
+  }
+  
+  if (!landmarks || !Array.isArray(landmarks) || landmarks.length === 0) {
+    if (console && console.warn) {
+      console.warn('[AVATAR] updateAvatarFromPose called with invalid landmarks');
+    }
+    return;
+  }
+  
+  if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+    if (console && console.error) {
+      console.error('[AVATAR] updateAvatarFromPose called without valid landmarkToWorld function');
+    }
+    return;
+  }
+  
+  if (!avatar.joints || !avatar.bodyParts) {
+    if (console && console.warn) {
+      console.warn('[AVATAR] Avatar missing joints or bodyParts');
+    }
     return;
   }
   
@@ -334,6 +359,11 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     }
     
     try {
+      if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+        console.error('[AVATAR] landmarkToWorld is not a function');
+        continue;
+      }
+      
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
       if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
         console.error(`[AVATAR] Invalid world position for ${name}:`, worldPos);
@@ -351,23 +381,36 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   // Update skeleton connection lines
   if (avatar.connections) {
     for (const conn of avatar.connections) {
-      const jointA = avatar.joints[conn.a];
-      const jointB = avatar.joints[conn.b];
-      
-      if (!jointA || !jointB || !jointA.mesh.visible || !jointB.mesh.visible) {
-        conn.line.visible = false;
-        continue;
+      try {
+        const jointA = avatar.joints[conn.a];
+        const jointB = avatar.joints[conn.b];
+        
+        if (!jointA || !jointB || !jointA.mesh || !jointB.mesh || 
+            !jointA.mesh.position || !jointB.mesh.position ||
+            !jointA.mesh.visible || !jointB.mesh.visible) {
+          if (conn.line) conn.line.visible = false;
+          continue;
+        }
+        
+        if (!conn.line || !conn.line.geometry || !conn.line.geometry.attributes || 
+            !conn.line.geometry.attributes.position || !conn.line.geometry.attributes.position.array) {
+          continue;
+        }
+        
+        const positions = conn.line.geometry.attributes.position.array;
+        positions[0] = jointA.mesh.position.x;
+        positions[1] = jointA.mesh.position.y;
+        positions[2] = jointA.mesh.position.z;
+        positions[3] = jointB.mesh.position.x;
+        positions[4] = jointB.mesh.position.y;
+        positions[5] = jointB.mesh.position.z;
+        conn.line.geometry.attributes.position.needsUpdate = true;
+        conn.line.visible = true;
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating connection line:', error);
+        }
       }
-      
-      const positions = conn.line.geometry.attributes.position.array;
-      positions[0] = jointA.mesh.position.x;
-      positions[1] = jointA.mesh.position.y;
-      positions[2] = jointA.mesh.position.z;
-      positions[3] = jointB.mesh.position.x;
-      positions[4] = jointB.mesh.position.y;
-      positions[5] = jointB.mesh.position.z;
-      conn.line.geometry.attributes.position.needsUpdate = true;
-      conn.line.visible = true;
     }
   }
   
