@@ -458,6 +458,14 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       return;
     }
     
+    // Calculate mid point, direction, and length
+    const mid = new THREE.Vector3()
+      .addVectors(jointA.mesh.position, jointB.mesh.position)
+      .multiplyScalar(0.5);
+    const direction = new THREE.Vector3()
+      .subVectors(jointB.mesh.position, jointA.mesh.position);
+    const length = direction.length();
+    
     if (length > 0.01) {
       [partWire, partSolid].forEach(part => {
         if (!part) return;
