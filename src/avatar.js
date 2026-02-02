@@ -318,13 +318,28 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   
   // Update all 33 joint positions with smooth interpolation
   for (const [name, idx] of Object.entries(map)) {
-    if (!landmarks[idx] || !avatar.joints[name]) continue;
+    if (!landmarks[idx] || !avatar.joints[name]) {
+      console.log(`[AVATAR] Missing landmark or joint for ${name} (idx: ${idx})`);
+      continue;
+    }
     
     const lm = landmarks[idx];
     const joint = avatar.joints[name];
     
+    // Check visibility (if available)
+    if (lm.visibility !== undefined && lm.visibility < 0.3) {
+      console.log(`[AVATAR] Low visibility for ${name}: ${lm.visibility}`);
+      joint.mesh.visible = false;
+      continue;
+    }
+    
     try {
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
+      if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
+        console.error(`[AVATAR] Invalid world position for ${name}:`, worldPos);
+        continue;
+      }
+      
       joint.pos.lerp(worldPos, avatar.smoothFactor);
       joint.mesh.position.copy(joint.pos);
       joint.mesh.visible = (lm.visibility === undefined || lm.visibility > 0.3);
@@ -388,50 +403,40 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       return;
     }
     
-    if (!jointA.mesh.visible || !jointB.mesh.visible) {
+    if (length > 0.01) {
+      [partWire, partSolid].forEach(part => {
+        if (!part) return;
+        part.position.copy(mid);
+        
+        // Scale to match joint distance with finer precision
+        const baseHeight = part.geometry.parameters.height || 1;
+        part.scale.y = (length + extraLength) / baseHeight;
+        
+        // Improved rotation to align with joint direction
+        // Use proper vector normalization and add fine-tuning for orientation
+        const normalizedDirection = direction.clone().normalize();
+        const upVector = new THREE.Vector3(0, 1, 0);
+        
+        // Calculate rotation quaternion with improved precision
+        part.quaternion.setFromUnitVectors(upVector, normalizedDirection);
+        
+        // Add fine rotation adjustments to prevent upside-down meshes
+        // Apply correction based on the direction vector to ensure proper orientation
+        if (normalizedDirection.y < -0.9) {
+          // If pointing strongly downward, add 180-degree correction
+          const correctionQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0), 
+            Math.PI
+          );
+          part.quaternion.multiply(correctionQuat);
+        }
+        
+        part.visible = true;
+      });
+    } else {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
-    }
-    
-    try {
-      const posA = jointA.mesh.position;
-      const posB = jointB.mesh.position;
-      
-      // Position at midpoint
-      const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
-      
-      // Orient along line between joints
-      const direction = new THREE.Vector3().subVectors(posB, posA);
-      const length = direction.length();
-      
-      if (length > 0.01) {
-        [partWire, partSolid].forEach(part => {
-          if (!part) return;
-          part.position.copy(mid);
-          
-          // Scale to match joint distance
-          const baseHeight = part.geometry.parameters.height || 1;
-          part.scale.y = (length + extraLength) / baseHeight;
-          
-          // Rotate to align with joint direction
-          part.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0, 1, 0),
-            direction.normalize()
-          );
-          part.visible = true;
-        });
-      } else {
-        if (partWire) partWire.visible = false;
-        if (partSolid) partSolid.visible = false;
-      }
-    } catch (error) {
-      if (console && console.error) {
-        console.error(`[AVATAR] Error updating dual body part ${wireframeName}/${solidName}:`, error);
-      }
-      // Hide parts on error to prevent visual glitches
-      if (partWire) partWire.visible = false;
-      if (partSolid) partSolid.visible = false;
     }
   }
   
