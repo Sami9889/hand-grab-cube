@@ -408,6 +408,15 @@ window.addEventListener('unhandledrejection', (event) => {
           // Flip Y and Z to correct orientation
           return new THREE.Vector3(x, -y, -z);
         });
+        
+        // Update avatar group position for walking/jumping movements
+        if (trackedPos) {
+          avatar.group.position.lerp(
+            new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
+            0.15 // Smooth movement
+          );
+          console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
+        }
       }
       // Fallback to screen landmarks (2D tracking)
       else if (latestPose.landmarks) {
@@ -450,6 +459,15 @@ window.addEventListener('unhandledrejection', (event) => {
           v.unproject(camera);
           return v;
         });
+        
+        // Update avatar group position for walking/jumping movements
+        if (trackedPos) {
+          avatar.group.position.lerp(
+            new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
+            0.15 // Smooth movement
+          );
+          console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
+        }
       }
     }
   }, { updateCamera });
