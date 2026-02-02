@@ -444,10 +444,26 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     rightFootIndex: 32
   };
   
+  // Calculate hip center for relative positioning
+  let hipCenter = null;
+  const leftHipLm = landmarks[map.leftHip];
+  const rightHipLm = landmarks[map.rightHip];
+  
+  if (leftHipLm && rightHipLm) {
+    const leftHipWorld = landmarkToWorld(leftHipLm.x, leftHipLm.y, leftHipLm.z);
+    const rightHipWorld = landmarkToWorld(rightHipLm.x, rightHipLm.y, rightHipLm.z);
+    
+    if (leftHipWorld && rightHipWorld) {
+      hipCenter = new THREE.Vector3()
+        .addVectors(leftHipWorld, rightHipWorld)
+        .multiplyScalar(0.5);
+    }
+  }
+  
   // Update all 33 joint positions with smooth interpolation
+  // Position joints RELATIVE to avatar group origin (not absolute world space)
   for (const [name, idx] of Object.entries(map)) {
     if (!landmarks[idx] || !avatar.joints[name]) {
-      console.log(`[AVATAR] Missing landmark or joint for ${name} (idx: ${idx})`);
       continue;
     }
     
@@ -456,7 +472,6 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     
     // Check visibility (if available)
     if (lm.visibility !== undefined && lm.visibility < 0.3) {
-      console.log(`[AVATAR] Low visibility for ${name}: ${lm.visibility}`);
       joint.mesh.visible = false;
       continue;
     }
@@ -469,11 +484,16 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
       if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
-        console.error(`[AVATAR] Invalid world position for ${name}:`, worldPos);
         continue;
       }
       
-      joint.pos.lerp(worldPos, avatar.smoothFactor);
+      // Position relative to hip center for proper leg crossing, etc.
+      let relativePos = worldPos;
+      if (hipCenter) {
+        relativePos = worldPos.clone().sub(hipCenter);
+      }
+      
+      joint.pos.lerp(relativePos, avatar.smoothFactor);
       joint.mesh.position.copy(joint.pos);
       joint.mesh.visible = (lm.visibility === undefined || lm.visibility > 0.3);
     } catch (e) {
