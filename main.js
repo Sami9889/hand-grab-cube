@@ -17,11 +17,23 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 (async function(){
-  // Initialize renderer
+  // Detect if mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  console.log('[Device] Mobile detected:', isMobile);
+  
+  // Initialize renderer with mobile optimizations
   const { scene, camera, renderer, cameraState, setCameraMode, updateCamera } = await createRenderer({ 
     enableVR: false, 
     cameraMode: 'orbit' 
   });
+  
+  // Apply mobile-specific renderer optimizations
+  if (isMobile) {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); // Lower pixel ratio for performance
+    renderer.shadowMap.enabled = false; // Disable shadows on mobile for performance
+    console.log('[Renderer] Mobile optimizations applied');
+  }
+  
   document.body.appendChild(renderer.domElement);
   
   const statusEl = document.getElementById('status');
@@ -39,6 +51,8 @@ window.addEventListener('unhandledrejection', (event) => {
   console.log('3D Avatar created:', avatar);
   avatar.group.visible = true;
   avatar.group.position.set(0, 0, 0);
+  // Flip avatar to correct MediaPipe Y-axis (which points downward)
+  avatar.group.scale.set(1, -1, 1);
   
   // Physics body for avatar
   avatar.physicsBody = {
@@ -117,11 +131,13 @@ window.addEventListener('unhandledrejection', (event) => {
         document.body.appendChild(v);
         
         try {
+          console.log('[MAIN] Starting camera with deviceId:', deviceId);
           const handle = await tracking.startCamera(v, { deviceId });
           activeCamHandles.push(handle);
           started++;
+          console.log('[MAIN] Camera started successfully');
         } catch (e) {
-          console.warn('Camera start failed:', e);
+          console.error('[MAIN] Camera start failed:', e);
         }
       }
       
@@ -131,6 +147,8 @@ window.addEventListener('unhandledrejection', (event) => {
           ? `Status: Tracking active (${started} camera${started > 1 ? 's' : ''})` 
           : 'Status: Failed to start cameras';
       }
+      
+      console.log('[MAIN] Started', started, 'camera(s)');
     });
   }
   
@@ -162,9 +180,14 @@ window.addEventListener('unhandledrejection', (event) => {
     });
   }
   
-  // Performance mode
+  // Performance mode - enable by default on mobile
   const lowPerfInput = document.getElementById('lowPerf');
   if (lowPerfInput) {
+    if (isMobile) {
+      lowPerfInput.checked = true;
+      tracking.applyPerf(true);
+      console.log('[Tracking] Low performance mode enabled for mobile');
+    }
     lowPerfInput.addEventListener('change', (e) => {
       tracking.applyPerf(e.target.checked);
     });
@@ -188,6 +211,10 @@ window.addEventListener('unhandledrejection', (event) => {
   // Tracking data
   let latestPose = null;
   const latestPosePerCamera = [];
+  
+  // Physics tracking variables
+  let trackedPos = null;
+  let smoothingFactor = 0.5;
 
   // Tracking event handler
   function handleTrackingEvent(ev) {
@@ -206,17 +233,21 @@ window.addEventListener('unhandledrejection', (event) => {
       const lm = ev.data.normalized || [];
       const world = ev.data.world || null;
       
+      console.log('[TRACKING EVENT] Pose received - normalized:', lm.length, 'world:', world ? world.length : 'none');
+      
       latestPosePerCamera[camIdx] = { landmarks: lm, world: world };
       
-      // Use first available camera's data
-      const first = latestPosePerCamera.find(p => p && (p.landmarks || p.world));
+      // Prefer world landmarks (3D) over normalized landmarks (2D)
+      const first = latestPosePerCamera.find(p => p && (p.world || p.landmarks));
       if (first) {
-        if (first.world) {
+        if (first.world && first.world.length > 0) {
           latestPose = { world: first.world };
           hud.set('Tracking', `3D: ${first.world.length} landmarks`);
-        } else if (first.landmarks) {
+          console.log('[TRACKING] Using 3D world landmarks');
+        } else if (first.landmarks && first.landmarks.length > 0) {
           latestPose = { landmarks: first.landmarks };
           hud.set('Tracking', `2D: ${first.landmarks.length} landmarks`);
+          console.log('[TRACKING] Using 2D screen landmarks');
         }
       }
       
@@ -225,6 +256,7 @@ window.addEventListener('unhandledrejection', (event) => {
       if (available.length > 1) {
         latestPose = { world: fuseAverages(available.map(p => p.world)) };
         hud.set('Fusion', `${available.length} cameras`);
+        console.log('[TRACKING] Fused', available.length, 'cameras');
       }
     }
   }
@@ -241,28 +273,121 @@ window.addEventListener('unhandledrejection', (event) => {
   document.body.appendChild(cameraModeSelect);
   cameraModeSelect.addEventListener('change', (e) => {
     setCameraMode(e.target.value);
+    // Show/hide mobile controls based on camera mode
+    if (isMobile) {
+      const mobileControls = document.getElementById('mobileControls');
+      const jumpButton = document.getElementById('jumpButton');
+      if (e.target.value === 'firstPerson') {
+        if (mobileControls) mobileControls.classList.add('active');
+        if (jumpButton) jumpButton.style.display = 'flex';
+      } else {
+        if (mobileControls) mobileControls.classList.remove('active');
+        if (jumpButton) jumpButton.style.display = 'none';
+      }
+    }
   });
+
+  // Mobile virtual joystick controls
+  if (isMobile) {
+    const joystick = document.getElementById('joystick');
+    const joystickKnob = joystick?.querySelector('.joystick-knob');
+    const jumpButton = document.getElementById('jumpButton');
+    
+    if (joystick && joystickKnob) {
+      let joystickActive = false;
+      let joystickCenter = { x: 0, y: 0 };
+      
+      joystick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        joystickActive = true;
+        const rect = joystick.getBoundingClientRect();
+        joystickCenter = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+      });
+      
+      joystick.addEventListener('touchmove', (e) => {
+        if (!joystickActive) return;
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - joystickCenter.x;
+        const deltaY = touch.clientY - joystickCenter.y;
+        
+        // Limit movement to joystick radius
+        const maxDistance = 35;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const limitedDeltaX = distance > maxDistance ? (deltaX / distance) * maxDistance : deltaX;
+        const limitedDeltaY = distance > maxDistance ? (deltaY / distance) * maxDistance : deltaY;
+        
+        // Update knob position
+        joystickKnob.style.transform = `translate(calc(-50% + ${limitedDeltaX}px), calc(-50% + ${limitedDeltaY}px))`;
+        
+        // Update camera state for first person mode
+        if (cameraState.mode === 'firstPerson') {
+          const normalizedX = limitedDeltaX / maxDistance;
+          const normalizedY = limitedDeltaY / maxDistance;
+          
+          cameraState.keys.w = normalizedY < -0.3;
+          cameraState.keys.s = normalizedY > 0.3;
+          cameraState.keys.a = normalizedX < -0.3;
+          cameraState.keys.d = normalizedX > 0.3;
+        }
+      });
+      
+      const resetJoystick = () => {
+        joystickActive = false;
+        joystickKnob.style.transform = 'translate(-50%, -50%)';
+        cameraState.keys.w = false;
+        cameraState.keys.s = false;
+        cameraState.keys.a = false;
+        cameraState.keys.d = false;
+      };
+      
+      joystick.addEventListener('touchend', resetJoystick);
+      joystick.addEventListener('touchcancel', resetJoystick);
+    }
+    
+    // Jump button
+    if (jumpButton) {
+      jumpButton.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        cameraState.keys.space = true;
+      });
+      
+      jumpButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        cameraState.keys.space = false;
+      });
+    }
+    
+    console.log('[Mobile] Virtual controls initialized');
+  }
 
   // Render loop
   let frameCount = 0;
+  let lastLogTime = 0;
+  
   startLoop(renderer, scene, camera, (dt) => {
     frameCount++;
+    const now = performance.now();
     
     if (latestPose) {
-      let trackedPos = null;
-      let smoothingFactor = smoothing;
-      
       // Use world landmarks if available (3D tracking)
       if (latestPose.world?.length) {
-        if (frameCount % 60 === 0) {
-          console.log('[Tracking] World landmarks:', latestPose.world.length);
+        // Log occasionally for debugging
+        if (now - lastLogTime > 2000) {
+          console.log('[3D TRACKING] Using world landmarks:', latestPose.world.length);
+          console.log('[3D TRACKING] Sample landmark (hip):', latestPose.world[23]);
+          lastLogTime = now;
         }
         
         const supportFoot = getSupportFootPosition(latestPose.world);
         if (supportFoot) {
           trackedPos = { 
             x: supportFoot.x, 
-            y: supportFoot.y + 1.6, 
+            y: -supportFoot.y + 1.6, 
             z: -supportFoot.z 
           };
           smoothingFactor = 0.85;
@@ -271,7 +396,7 @@ window.addEventListener('unhandledrejection', (event) => {
           if (pelvis) {
             trackedPos = { 
               x: pelvis.x, 
-              y: pelvis.y + 1.6, 
+              y: -pelvis.y + 1.6, 
               z: -pelvis.z 
             };
           }
@@ -286,8 +411,10 @@ window.addEventListener('unhandledrejection', (event) => {
       }
       // Fallback to screen landmarks (2D tracking)
       else if (latestPose.landmarks) {
-        if (frameCount % 60 === 0) {
-          console.log('[Tracking] Screen landmarks:', latestPose.landmarks.length);
+        // Log occasionally for debugging
+        if (now - lastLogTime > 2000) {
+          console.log('[2D TRACKING] Using screen landmarks:', latestPose.landmarks.length);
+          lastLogTime = now;
         }
         
         const supportFoot = getSupportFootPosition(latestPose.landmarks);
@@ -323,19 +450,6 @@ window.addEventListener('unhandledrejection', (event) => {
           v.unproject(camera);
           return v;
         });
-      }
-      
-      // Physics stabilization
-      if (avatar.physicsBody && trackedPos) {
-        clampVelocity(avatar.physicsBody, 4);
-        clampPosition(avatar.physicsBody, -2, 3);
-        
-        avatar.physicsBody.position.x = avatar.physicsBody.position.x * (1 - smoothingFactor) + trackedPos.x * smoothingFactor;
-        avatar.physicsBody.position.y = avatar.physicsBody.position.y * (1 - smoothingFactor) + trackedPos.y * smoothingFactor;
-        avatar.physicsBody.position.z = avatar.physicsBody.position.z * (1 - smoothingFactor) + trackedPos.z * smoothingFactor;
-        avatar.physicsBody.velocity.x = 0;
-        avatar.physicsBody.velocity.y = 0;
-        avatar.physicsBody.velocity.z = 0;
       }
     }
   }, { updateCamera });
