@@ -275,9 +275,35 @@ export function createAvatar(scene) {
 }
 
 export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
-  if (!avatar || !landmarks || landmarks.length === 0) {
-    return;
-  }
+  try {
+    // Comprehensive input validation
+    if (!avatar) {
+      if (console && console.warn) {
+        console.warn('[AVATAR] updateAvatarFromPose called with null/undefined avatar');
+      }
+      return;
+    }
+    
+    if (!landmarks || !Array.isArray(landmarks) || landmarks.length === 0) {
+      if (console && console.warn) {
+        console.warn('[AVATAR] updateAvatarFromPose called with invalid landmarks');
+      }
+      return;
+    }
+    
+    if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+      if (console && console.error) {
+        console.error('[AVATAR] updateAvatarFromPose called without valid landmarkToWorld function');
+      }
+      return;
+    }
+    
+    if (!avatar.joints || !avatar.bodyParts) {
+      if (console && console.warn) {
+        console.warn('[AVATAR] Avatar missing joints or bodyParts');
+      }
+      return;
+    }
   
   // Complete MediaPipe Pose landmark mapping (all 33 points)
   const map = {
@@ -318,13 +344,32 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   
   // Update all 33 joint positions with smooth interpolation
   for (const [name, idx] of Object.entries(map)) {
-    if (!landmarks[idx] || !avatar.joints[name]) continue;
+    if (!landmarks[idx] || !avatar.joints || !avatar.joints[name]) continue;
     
     const lm = landmarks[idx];
     const joint = avatar.joints[name];
     
+    // Validate joint structure
+    if (!joint || !joint.pos || !joint.mesh || !joint.mesh.position) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Invalid joint structure for ${name}`);
+      }
+      continue;
+    }
+    
     try {
+      if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+        console.error('[AVATAR] landmarkToWorld is not a function');
+        continue;
+      }
+      
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
+      
+      if (!worldPos || typeof worldPos.x === 'undefined') {
+        console.warn(`[AVATAR] Invalid world position for ${name}`);
+        continue;
+      }
+      
       joint.pos.lerp(worldPos, avatar.smoothFactor);
       joint.mesh.position.copy(joint.pos);
       joint.mesh.visible = (lm.visibility === undefined || lm.visibility > 0.3);
@@ -336,23 +381,36 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   // Update skeleton connection lines
   if (avatar.connections) {
     for (const conn of avatar.connections) {
-      const jointA = avatar.joints[conn.a];
-      const jointB = avatar.joints[conn.b];
-      
-      if (!jointA || !jointB || !jointA.mesh.visible || !jointB.mesh.visible) {
-        conn.line.visible = false;
-        continue;
+      try {
+        const jointA = avatar.joints[conn.a];
+        const jointB = avatar.joints[conn.b];
+        
+        if (!jointA || !jointB || !jointA.mesh || !jointB.mesh || 
+            !jointA.mesh.position || !jointB.mesh.position ||
+            !jointA.mesh.visible || !jointB.mesh.visible) {
+          if (conn.line) conn.line.visible = false;
+          continue;
+        }
+        
+        if (!conn.line || !conn.line.geometry || !conn.line.geometry.attributes || 
+            !conn.line.geometry.attributes.position || !conn.line.geometry.attributes.position.array) {
+          continue;
+        }
+        
+        const positions = conn.line.geometry.attributes.position.array;
+        positions[0] = jointA.mesh.position.x;
+        positions[1] = jointA.mesh.position.y;
+        positions[2] = jointA.mesh.position.z;
+        positions[3] = jointB.mesh.position.x;
+        positions[4] = jointB.mesh.position.y;
+        positions[5] = jointB.mesh.position.z;
+        conn.line.geometry.attributes.position.needsUpdate = true;
+        conn.line.visible = true;
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating connection line:', error);
+        }
       }
-      
-      const positions = conn.line.geometry.attributes.position.array;
-      positions[0] = jointA.mesh.position.x;
-      positions[1] = jointA.mesh.position.y;
-      positions[2] = jointA.mesh.position.z;
-      positions[3] = jointB.mesh.position.x;
-      positions[4] = jointB.mesh.position.y;
-      positions[5] = jointB.mesh.position.z;
-      conn.line.geometry.attributes.position.needsUpdate = true;
-      conn.line.visible = true;
     }
   }
   
@@ -361,50 +419,87 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
-    if (!jointA || !jointB || !partWire || !partSolid) return;
+    // Enhanced validation with warnings for debugging
+    if (!jointA || !jointB) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing joints for ${wireframeName}/${solidName}`);
+      }
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
+    
+    if (!partWire || !partSolid) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`);
+      }
+      return;
+    }
+    
+    // Check if joints have valid mesh and position properties
+    if (!jointA.mesh || !jointB.mesh || !jointA.mesh.position || !jointB.mesh.position) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Invalid joint mesh structure for ${wireframeName}/${solidName}`);
+      }
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
+    
     if (!jointA.mesh.visible || !jointB.mesh.visible) {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
     }
     
-    const posA = jointA.mesh.position;
-    const posB = jointB.mesh.position;
-    
-    // Position at midpoint
-    const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
-    
-    // Orient along line between joints
-    const direction = new THREE.Vector3().subVectors(posB, posA);
-    const length = direction.length();
-    
-    if (length > 0.01) {
-      [partWire, partSolid].forEach(part => {
-        if (!part) return;
-        part.position.copy(mid);
-        
-        // Scale to match joint distance
-        const baseHeight = part.geometry.parameters.height || 1;
-        part.scale.y = (length + extraLength) / baseHeight;
-        
-        // Rotate to align with joint direction
-        part.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction.normalize()
-        );
-        part.visible = true;
-      });
-    } else {
+    try {
+      const posA = jointA.mesh.position;
+      const posB = jointB.mesh.position;
+      
+      // Position at midpoint
+      const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
+      
+      // Orient along line between joints
+      const direction = new THREE.Vector3().subVectors(posB, posA);
+      const length = direction.length();
+      
+      if (length > 0.01) {
+        [partWire, partSolid].forEach(part => {
+          if (!part) return;
+          
+          // Ensure part has necessary properties before accessing
+          if (!part.position || !part.scale || !part.quaternion || !part.geometry) {
+            if (console && console.warn) {
+              console.warn(`[AVATAR] Part missing required properties for ${wireframeName}/${solidName}`);
+            }
+            return;
+          }
+          
+          part.position.copy(mid);
+          
+          // Scale to match joint distance - with safe property access
+          const baseHeight = (part.geometry.parameters && part.geometry.parameters.height) || 1;
+          part.scale.y = (length + extraLength) / baseHeight;
+          
+          // Rotate to align with joint direction
+          part.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            direction.normalize()
+          );
+          part.visible = true;
+        });
+      } else {
+        if (partWire) partWire.visible = false;
+        if (partSolid) partSolid.visible = false;
+      }
+    } catch (error) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error updating dual body part ${wireframeName}/${solidName}:`, error);
+      }
+      // Hide parts on error to prevent visual glitches
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
     }
-    
-    [partWire, partSolid].forEach(part => {
-      if (part) {
-        part.position.copy(joint.mesh.position);
-        part.visible = true;
-      }
-    });
   }
   
   // Helper for single-point body parts (dual-layer spheres)
@@ -412,18 +507,54 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
-    if (!joint || !joint.mesh.visible || !partWire || !partSolid) {
+    // Enhanced validation with warnings for debugging
+    if (!joint) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing joint for ${wireframeName}/${solidName}`);
+      }
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
     }
     
-    [partWire, partSolid].forEach(part => {
-      if (part) {
-        part.position.copy(joint.mesh.position);
-        part.visible = true;
+    if (!partWire || !partSolid) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`);
       }
-    });
+      return;
+    }
+    
+    // Check if joint has valid mesh and position properties
+    if (!joint.mesh || !joint.mesh.position) {
+      if (console && console.warn) {
+        console.warn(`[AVATAR] Invalid joint mesh structure for ${wireframeName}/${solidName}`);
+      }
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
+    
+    if (!joint.mesh.visible) {
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+      return;
+    }
+    
+    try {
+      [partWire, partSolid].forEach(part => {
+        if (part && part.position) {
+          part.position.copy(joint.mesh.position);
+          part.visible = true;
+        }
+      });
+    } catch (error) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error updating dual sphere ${wireframeName}/${solidName}:`, error);
+      }
+      // Hide parts on error to prevent visual glitches
+      if (partWire) partWire.visible = false;
+      if (partSolid) partSolid.visible = false;
+    }
   }
   
   // Update high-detail grid body parts with dual-layer rendering
@@ -434,47 +565,71 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     updateDualSphere('headWireframe', 'headSolid', j.nose);
     
     // NECK - between head and shoulders
-    if (j.nose && j.leftShoulder && j.rightShoulder) {
-      const shoulderCenter = new THREE.Vector3()
-        .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
-        .multiplyScalar(0.5);
-      const neckTop = j.nose.mesh.position.clone();
-      neckTop.y -= 0.1; // slightly below head
-      
-      updateDualBodyPart('neckWireframe', 'neckSolid', 
-        { mesh: { position: neckTop, visible: true } }, 
-        { mesh: { position: shoulderCenter, visible: true } }
-      );
+    if (j.nose && j.leftShoulder && j.rightShoulder && 
+        j.nose.mesh && j.leftShoulder.mesh && j.rightShoulder.mesh &&
+        j.nose.mesh.position && j.leftShoulder.mesh.position && j.rightShoulder.mesh.position) {
+      try {
+        const shoulderCenter = new THREE.Vector3()
+          .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
+          .multiplyScalar(0.5);
+        const neckTop = j.nose.mesh.position.clone();
+        neckTop.y -= 0.1; // slightly below head
+        
+        updateDualBodyPart('neckWireframe', 'neckSolid', 
+          { mesh: { position: neckTop, visible: true } }, 
+          { mesh: { position: shoulderCenter, visible: true } }
+        );
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating neck:', error);
+        }
+      }
     }
     
     // TORSO - between shoulders and hips center
-    if (j.leftShoulder && j.rightShoulder && j.leftHip && j.rightHip) {
-      const shoulderCenter = new THREE.Vector3()
-        .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
-        .multiplyScalar(0.5);
-      const hipCenter = new THREE.Vector3()
-        .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
-        .multiplyScalar(0.5);
-      
-      updateDualBodyPart('torsoWireframe', 'torsoSolid',
-        { mesh: { position: shoulderCenter, visible: true } },
-        { mesh: { position: hipCenter, visible: true } }
-      );
+    if (j.leftShoulder && j.rightShoulder && j.leftHip && j.rightHip &&
+        j.leftShoulder.mesh && j.rightShoulder.mesh && j.leftHip.mesh && j.rightHip.mesh &&
+        j.leftShoulder.mesh.position && j.rightShoulder.mesh.position && 
+        j.leftHip.mesh.position && j.rightHip.mesh.position) {
+      try {
+        const shoulderCenter = new THREE.Vector3()
+          .addVectors(j.leftShoulder.mesh.position, j.rightShoulder.mesh.position)
+          .multiplyScalar(0.5);
+        const hipCenter = new THREE.Vector3()
+          .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
+          .multiplyScalar(0.5);
+        
+        updateDualBodyPart('torsoWireframe', 'torsoSolid',
+          { mesh: { position: shoulderCenter, visible: true } },
+          { mesh: { position: hipCenter, visible: true } }
+        );
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating torso:', error);
+        }
+      }
     }
     
     // PELVIS - at hip center
-    if (j.leftHip && j.rightHip) {
-      const hipCenter = new THREE.Vector3()
-        .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
-        .multiplyScalar(0.5);
-      
-      ['pelvisWireframe', 'pelvisSolid'].forEach(name => {
-        const part = avatar.bodyParts[name];
-        if (part) {
-          part.position.copy(hipCenter);
-          part.visible = true;
+    if (j.leftHip && j.rightHip && j.leftHip.mesh && j.rightHip.mesh &&
+        j.leftHip.mesh.position && j.rightHip.mesh.position) {
+      try {
+        const hipCenter = new THREE.Vector3()
+          .addVectors(j.leftHip.mesh.position, j.rightHip.mesh.position)
+          .multiplyScalar(0.5);
+        
+        ['pelvisWireframe', 'pelvisSolid'].forEach(name => {
+          const part = avatar.bodyParts[name];
+          if (part) {
+            part.position.copy(hipCenter);
+            part.visible = true;
+          }
+        });
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating pelvis:', error);
         }
-      });
+      }
     }
     
     // ARMS - Dual-layer high-detail cylinders
@@ -494,50 +649,73 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     updateDualBodyPart('rightShinWireframe', 'rightShinSolid', j.rightKnee, j.rightAnkle);
     
     // FEET - Dual-layer boxes with proper orientation
-    if (j.leftAnkle && j.leftFootIndex && j.leftHeel) {
-      const footMid = new THREE.Vector3()
-        .add(j.leftAnkle.mesh.position)
-        .add(j.leftFootIndex.mesh.position)
-        .add(j.leftHeel.mesh.position)
-        .multiplyScalar(1/3);
-      
-      const footDir = new THREE.Vector3()
-        .subVectors(j.leftFootIndex.mesh.position, j.leftHeel.mesh.position);
-      
-      ['leftFootWireframe', 'leftFootSolid'].forEach(name => {
-        const part = avatar.bodyParts[name];
-        if (part && footDir.length() > 0.01) {
-          part.position.copy(footMid);
-          part.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1),
-            footDir.normalize()
-          );
-          part.visible = j.leftAnkle.mesh.visible && j.leftFootIndex.mesh.visible;
+    if (j.leftAnkle && j.leftFootIndex && j.leftHeel &&
+        j.leftAnkle.mesh && j.leftFootIndex.mesh && j.leftHeel.mesh &&
+        j.leftAnkle.mesh.position && j.leftFootIndex.mesh.position && j.leftHeel.mesh.position) {
+      try {
+        const footMid = new THREE.Vector3()
+          .add(j.leftAnkle.mesh.position)
+          .add(j.leftFootIndex.mesh.position)
+          .add(j.leftHeel.mesh.position)
+          .multiplyScalar(1/3);
+        
+        const footDir = new THREE.Vector3()
+          .subVectors(j.leftFootIndex.mesh.position, j.leftHeel.mesh.position);
+        
+        ['leftFootWireframe', 'leftFootSolid'].forEach(name => {
+          const part = avatar.bodyParts[name];
+          if (part && footDir.length() > 0.01) {
+            part.position.copy(footMid);
+            part.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              footDir.normalize()
+            );
+            part.visible = j.leftAnkle.mesh.visible && j.leftFootIndex.mesh.visible;
+          }
+        });
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating left foot:', error);
         }
-      });
+      }
     }
     
-    if (j.rightAnkle && j.rightFootIndex && j.rightHeel) {
-      const footMid = new THREE.Vector3()
-        .add(j.rightAnkle.mesh.position)
-        .add(j.rightFootIndex.mesh.position)
-        .add(j.rightHeel.mesh.position)
-        .multiplyScalar(1/3);
-      
-      const footDir = new THREE.Vector3()
-        .subVectors(j.rightFootIndex.mesh.position, j.rightHeel.mesh.position);
-      
-      ['rightFootWireframe', 'rightFootSolid'].forEach(name => {
-        const part = avatar.bodyParts[name];
-        if (part && footDir.length() > 0.01) {
-          part.position.copy(footMid);
-          part.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1),
-            footDir.normalize()
-          );
-          part.visible = j.rightAnkle.mesh.visible && j.rightFootIndex.mesh.visible;
+    if (j.rightAnkle && j.rightFootIndex && j.rightHeel &&
+        j.rightAnkle.mesh && j.rightFootIndex.mesh && j.rightHeel.mesh &&
+        j.rightAnkle.mesh.position && j.rightFootIndex.mesh.position && j.rightHeel.mesh.position) {
+      try {
+        const footMid = new THREE.Vector3()
+          .add(j.rightAnkle.mesh.position)
+          .add(j.rightFootIndex.mesh.position)
+          .add(j.rightHeel.mesh.position)
+          .multiplyScalar(1/3);
+        
+        const footDir = new THREE.Vector3()
+          .subVectors(j.rightFootIndex.mesh.position, j.rightHeel.mesh.position);
+        
+        ['rightFootWireframe', 'rightFootSolid'].forEach(name => {
+          const part = avatar.bodyParts[name];
+          if (part && footDir.length() > 0.01) {
+            part.position.copy(footMid);
+            part.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              footDir.normalize()
+            );
+            part.visible = j.rightAnkle.mesh.visible && j.rightFootIndex.mesh.visible;
+          }
+        });
+      } catch (error) {
+        if (console && console.error) {
+          console.error('[AVATAR] Error updating right foot:', error);
         }
-      });
+      }
+    }
+  }
+  } catch (globalError) {
+    // Catch-all for any unexpected errors in the entire function
+    if (console && console.error) {
+      console.error('[AVATAR] Critical error in updateAvatarFromPose:', globalError);
+      console.error('[AVATAR] Stack:', globalError.stack);
     }
   }
 }
