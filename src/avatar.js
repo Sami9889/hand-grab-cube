@@ -275,35 +275,34 @@ export function createAvatar(scene) {
 }
 
 export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
-  try {
-    // Comprehensive input validation
-    if (!avatar) {
-      if (console && console.warn) {
-        console.warn('[AVATAR] updateAvatarFromPose called with null/undefined avatar');
-      }
-      return;
+  // Comprehensive input validation
+  if (!avatar) {
+    if (console && console.warn) {
+      console.warn('[AVATAR] updateAvatarFromPose called with null/undefined avatar');
     }
-    
-    if (!landmarks || !Array.isArray(landmarks) || landmarks.length === 0) {
-      if (console && console.warn) {
-        console.warn('[AVATAR] updateAvatarFromPose called with invalid landmarks');
-      }
-      return;
+    return;
+  }
+  
+  if (!landmarks || !Array.isArray(landmarks) || landmarks.length === 0) {
+    if (console && console.warn) {
+      console.warn('[AVATAR] updateAvatarFromPose called with invalid landmarks');
     }
-    
-    if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
-      if (console && console.error) {
-        console.error('[AVATAR] updateAvatarFromPose called without valid landmarkToWorld function');
-      }
-      return;
+    return;
+  }
+  
+  if (!landmarkToWorld || typeof landmarkToWorld !== 'function') {
+    if (console && console.error) {
+      console.error('[AVATAR] updateAvatarFromPose called without valid landmarkToWorld function');
     }
-    
-    if (!avatar.joints || !avatar.bodyParts) {
-      if (console && console.warn) {
-        console.warn('[AVATAR] Avatar missing joints or bodyParts');
-      }
-      return;
+    return;
+  }
+  
+  if (!avatar.joints || !avatar.bodyParts) {
+    if (console && console.warn) {
+      console.warn('[AVATAR] Avatar missing joints or bodyParts');
     }
+    return;
+  }
   
   // Complete MediaPipe Pose landmark mapping (all 33 points)
   const map = {
@@ -344,16 +343,18 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
   
   // Update all 33 joint positions with smooth interpolation
   for (const [name, idx] of Object.entries(map)) {
-    if (!landmarks[idx] || !avatar.joints || !avatar.joints[name]) continue;
+    if (!landmarks[idx] || !avatar.joints[name]) {
+      console.log(`[AVATAR] Missing landmark or joint for ${name} (idx: ${idx})`);
+      continue;
+    }
     
     const lm = landmarks[idx];
     const joint = avatar.joints[name];
     
-    // Validate joint structure
-    if (!joint || !joint.pos || !joint.mesh || !joint.mesh.position) {
-      if (console && console.warn) {
-        console.warn(`[AVATAR] Invalid joint structure for ${name}`);
-      }
+    // Check visibility (if available)
+    if (lm.visibility !== undefined && lm.visibility < 0.3) {
+      console.log(`[AVATAR] Low visibility for ${name}: ${lm.visibility}`);
+      joint.mesh.visible = false;
       continue;
     }
     
@@ -364,9 +365,8 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       }
       
       const worldPos = landmarkToWorld(lm.x, lm.y, lm.z);
-      
-      if (!worldPos || typeof worldPos.x === 'undefined') {
-        console.warn(`[AVATAR] Invalid world position for ${name}`);
+      if (!worldPos || isNaN(worldPos.x) || isNaN(worldPos.y) || isNaN(worldPos.z)) {
+        console.error(`[AVATAR] Invalid world position for ${name}:`, worldPos);
         continue;
       }
       
@@ -446,59 +446,40 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
       return;
     }
     
-    if (!jointA.mesh.visible || !jointB.mesh.visible) {
+    if (length > 0.01) {
+      [partWire, partSolid].forEach(part => {
+        if (!part) return;
+        part.position.copy(mid);
+        
+        // Scale to match joint distance with finer precision
+        const baseHeight = part.geometry.parameters.height || 1;
+        part.scale.y = (length + extraLength) / baseHeight;
+        
+        // Improved rotation to align with joint direction
+        // Use proper vector normalization and add fine-tuning for orientation
+        const normalizedDirection = direction.clone().normalize();
+        const upVector = new THREE.Vector3(0, 1, 0);
+        
+        // Calculate rotation quaternion with improved precision
+        part.quaternion.setFromUnitVectors(upVector, normalizedDirection);
+        
+        // Add fine rotation adjustments to prevent upside-down meshes
+        // Apply correction based on the direction vector to ensure proper orientation
+        if (normalizedDirection.y < -0.9) {
+          // If pointing strongly downward, add 180-degree correction
+          const correctionQuat = new THREE.Quaternion().setFromAxisAngle(
+            new THREE.Vector3(1, 0, 0), 
+            Math.PI
+          );
+          part.quaternion.multiply(correctionQuat);
+        }
+        
+        part.visible = true;
+      });
+    } else {
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
-    }
-    
-    try {
-      const posA = jointA.mesh.position;
-      const posB = jointB.mesh.position;
-      
-      // Position at midpoint
-      const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
-      
-      // Orient along line between joints
-      const direction = new THREE.Vector3().subVectors(posB, posA);
-      const length = direction.length();
-      
-      if (length > 0.01) {
-        [partWire, partSolid].forEach(part => {
-          if (!part) return;
-          
-          // Ensure part has necessary properties before accessing
-          if (!part.position || !part.scale || !part.quaternion || !part.geometry) {
-            if (console && console.warn) {
-              console.warn(`[AVATAR] Part missing required properties for ${wireframeName}/${solidName}`);
-            }
-            return;
-          }
-          
-          part.position.copy(mid);
-          
-          // Scale to match joint distance - with safe property access
-          const baseHeight = (part.geometry.parameters && part.geometry.parameters.height) || 1;
-          part.scale.y = (length + extraLength) / baseHeight;
-          
-          // Rotate to align with joint direction
-          part.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0, 1, 0),
-            direction.normalize()
-          );
-          part.visible = true;
-        });
-      } else {
-        if (partWire) partWire.visible = false;
-        if (partSolid) partSolid.visible = false;
-      }
-    } catch (error) {
-      if (console && console.error) {
-        console.error(`[AVATAR] Error updating dual body part ${wireframeName}/${solidName}:`, error);
-      }
-      // Hide parts on error to prevent visual glitches
-      if (partWire) partWire.visible = false;
-      if (partSolid) partSolid.visible = false;
     }
   }
   
@@ -542,7 +523,7 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     
     try {
       [partWire, partSolid].forEach(part => {
-        if (part && part.position) {
+        if (part) {
           part.position.copy(joint.mesh.position);
           part.visible = true;
         }
@@ -709,13 +690,6 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
           console.error('[AVATAR] Error updating right foot:', error);
         }
       }
-    }
-  }
-  } catch (globalError) {
-    // Catch-all for any unexpected errors in the entire function
-    if (console && console.error) {
-      console.error('[AVATAR] Critical error in updateAvatarFromPose:', globalError);
-      console.error('[AVATAR] Stack:', globalError.stack);
     }
   }
 }
