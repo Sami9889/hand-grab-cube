@@ -129,6 +129,7 @@ export function createAvatar(scene) {
     gridMat.clone()
   );
   headWireframe.castShadow = true;
+  headWireframe.visible = true;
   group.add(headWireframe);
   bodyParts.headWireframe = headWireframe;
   
@@ -136,6 +137,7 @@ export function createAvatar(scene) {
     new THREE.SphereGeometry(0.12, 32, 32),
     solidGridMat.clone()
   );
+  headSolid.visible = true;
   group.add(headSolid);
   bodyParts.headSolid = headSolid;
   
@@ -191,12 +193,14 @@ export function createAvatar(scene) {
       gridMat.clone()
     );
     wireframe.castShadow = true;
+    wireframe.visible = true; // Initialize as visible
     group.add(wireframe);
     
     const solid = new THREE.Mesh(
       new THREE.CylinderGeometry(radiusTop * 0.9, radiusBottom * 0.9, height, 16, 16),
       solidGridMat.clone()
     );
+    solid.visible = true; // Initialize as visible
     group.add(solid);
     
     bodyParts[name + 'Wireframe'] = wireframe;
@@ -431,10 +435,12 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     const partWire = avatar.bodyParts[wireframeName];
     const partSolid = avatar.bodyParts[solidName];
     
+    console.log(`[AVATAR] updateDualBodyPart called for ${wireframeName}/${solidName}`);
+    
     // Enhanced validation with warnings for debugging
     if (!jointA || !jointB) {
       if (console && console.warn) {
-        console.warn(`[AVATAR] Missing joints for ${wireframeName}/${solidName}`);
+        console.warn(`[AVATAR] Missing joints for ${wireframeName}/${solidName}`, jointA, jointB);
       }
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
@@ -443,7 +449,7 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
     
     if (!partWire || !partSolid) {
       if (console && console.warn) {
-        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`);
+        console.warn(`[AVATAR] Missing body parts: ${wireframeName}/${solidName}`, partWire, partSolid);
       }
       return;
     }
@@ -495,8 +501,10 @@ export function updateAvatarFromPose(avatar, landmarks, landmarkToWorld) {
         }
         
         part.visible = true;
+        console.log(`[AVATAR] ${wireframeName}: SET VISIBLE = true`);
       });
     } else {
+      console.log(`[AVATAR] ${wireframeName}: length too small, hiding parts`);
       if (partWire) partWire.visible = false;
       if (partSolid) partSolid.visible = false;
       return;
