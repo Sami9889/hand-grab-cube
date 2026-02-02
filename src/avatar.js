@@ -52,18 +52,24 @@ export function createAvatar(scene) {
   
   // Create glowing spheres for all 33 joints
   jointNames.forEach((name, idx) => {
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.03, 16, 16),
-      jointMat.clone()
-    );
-    sphere.visible = true;
-    sphere.castShadow = true;
-    group.add(sphere);
-    joints[name] = { 
-      mesh: sphere, 
-      pos: new THREE.Vector3(),
-      index: idx
-    };
+    try {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.03, 16, 16),
+        jointMat.clone()
+      );
+      sphere.visible = true;
+      sphere.castShadow = true;
+      group.add(sphere);
+      joints[name] = { 
+        mesh: sphere, 
+        pos: new THREE.Vector3(),
+        index: idx
+      };
+    } catch (err) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error creating joint ${name}:`, err);
+      }
+    }
   });
   
   // Create connection lines (grid structure) - MediaPipe skeleton
@@ -95,18 +101,24 @@ export function createAvatar(scene) {
   
   // Create thin glowing lines for connections
   skeletonConnections.forEach(([a, b]) => {
-    const lineMat = new THREE.LineBasicMaterial({ 
-      color: 0x00ffff, 
-      transparent: true, 
-      opacity: 0.8,
-      linewidth: 2
-    });
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(6); // 2 points * 3 coordinates
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const line = new THREE.Line(geometry, lineMat);
-    group.add(line);
-    connections.push({ line, a, b });
+    try {
+      const lineMat = new THREE.LineBasicMaterial({ 
+        color: 0x00ffff, 
+        transparent: true, 
+        opacity: 0.8,
+        linewidth: 2
+      });
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(6); // 2 points * 3 coordinates
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const line = new THREE.Line(geometry, lineMat);
+      group.add(line);
+      connections.push({ line, a, b });
+    } catch (err) {
+      if (console && console.error) {
+        console.error(`[AVATAR] Error creating connection between ${a} and ${b}:`, err);
+      }
+    }
   });
   
   // Create HIGH-DETAIL grid mesh body parts (32+ segments for grid-like appearance)
