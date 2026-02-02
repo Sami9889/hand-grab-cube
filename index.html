@@ -37,7 +37,10 @@
     })();
   </script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>etcGrab Cube — Professional Body Tracking</title>
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="stylesheet" href="styles.css" />
@@ -77,6 +80,14 @@
 
   <!-- Hidden video element for camera feed -->
   <video id="video" autoplay playsinline style="display:none"></video>
+  
+  <!-- Mobile virtual controls (shown on touch devices) -->
+  <div id="mobileControls">
+    <div class="joystick-container" id="joystick">
+      <div class="joystick-knob"></div>
+    </div>
+  </div>
+  <div class="mobile-button" id="jumpButton" style="left: 20px; display: none;">↑</div>
 
   <!-- MediaPipe Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>

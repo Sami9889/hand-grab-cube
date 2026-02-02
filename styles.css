@@ -162,21 +162,94 @@ html, body {
 }
 
 /* Responsive design */
-@media (max-width: 480px) { 
+@media (max-width: 768px) { 
   #ui { 
     left: 8px; 
     right: 8px; 
     top: 8px; 
     max-width: unset; 
-    padding: 12px; 
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  #ui h1 {
+    font-size: 16px;
   }
   
   .controls { 
-    gap: 8px; 
+    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .controls button {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .control-inline {
+    width: 100%;
+    justify-content: space-between;
   }
   
   .control-inline input[type="range"] { 
-    width: 100px; 
+    width: 150px;
+  }
+  
+  #cameraSelect {
+    width: 100% !important;
+  }
+  
+  #eventLog {
+    max-height: 120px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) { 
+  #ui { 
+    padding: 10px;
+    font-size: 13px;
+  }
+  
+  #ui h1 {
+    font-size: 15px;
+  }
+  
+  #ui p {
+    font-size: 12px;
+  }
+  
+  .controls button {
+    padding: 10px;
+    font-size: 13px;
+  }
+  
+  .control-inline input[type="range"] { 
+    width: 120px; 
+  }
+  
+  #eventLog {
+    max-height: 100px;
+  }
+}
+
+/* Touch-friendly controls */
+@media (hover: none) and (pointer: coarse) {
+  .controls button {
+    padding: 14px 16px;
+    font-size: 15px;
+    min-height: 48px;
+  }
+  
+  .control-inline input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .control-inline input[type="range"] {
+    height: 32px;
   }
 }
 
@@ -188,6 +261,66 @@ canvas {
   left: 0;
   width: 100%;
   height: 100%;
+  touch-action: none;
+}
+
+/* Mobile virtual joystick */
+#mobileControls {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999;
+}
+
+#mobileControls.active {
+  display: block;
+}
+
+.joystick-container {
+  width: 120px;
+  height: 120px;
+  background: rgba(0, 209, 255, 0.15);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  position: relative;
+  touch-action: none;
+  backdrop-filter: blur(8px);
+}
+
+.joystick-knob {
+  width: 50px;
+  height: 50px;
+  background: var(--accent);
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.1s ease;
+  box-shadow: 0 4px 12px rgba(0, 209, 255, 0.4);
+}
+
+.mobile-button {
+  width: 60px;
+  height: 60px;
+  background: rgba(0, 209, 255, 0.2);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  position: fixed;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: var(--accent);
+  touch-action: none;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+.mobile-button:active {
+  background: rgba(0, 209, 255, 0.4);
 }
 
 /* Loading indicator */
