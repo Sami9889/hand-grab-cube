@@ -1,21 +1,91 @@
-MIT License
+# LICENSE
 
-Copyright (c) 2025 Sami9889
+Copyright (c) 2026 Sami Singh
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+ALL RIGHTS RESERVED.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+────────────────────────────────────────
+PERMITTED USE
+────────────────────────────────────────
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Permission is granted to view and use the Software for private,
+non-commercial, reference purposes only.
+
+────────────────────────────────────────
+RESTRICTED USE
+────────────────────────────────────────
+
+Commercial use is NOT permitted unless explicit prior written permission
+is granted by the copyright holder and, where applicable, a paid
+commercial licence has been issued.
+
+Commercial use includes, but is not limited to:
+- Use in any business, company, or organisation
+- Use in paid products or services
+- Use in software that generates revenue (ads, subscriptions, sales)
+- Use in client work or contracted work
+- Use in SaaS, hosted services, or monetised platforms
+
+No permission is granted to:
+- Copy or reproduce the Software
+- Modify, adapt, or create derivative works
+- Merge the Software with other projects
+- Distribute or redistribute the Software
+- Sublicense or sell the Software
+- Fork or mirror the repository
+
+────────────────────────────────────────
+ATTRIBUTION
+────────────────────────────────────────
+
+Any authorised use must include clear and visible credit to:
+**“Sami Singh”**
+
+────────────────────────────────────────
+COMMERCIAL LICENSING
+────────────────────────────────────────
+
+Commercial licences may be granted at the sole discretion of the
+copyright holder and may require payment.
+
+Commercial licence terms, pricing, and conditions are determined
+separately and are not granted under this licence.
+
+────────────────────────────────────────
+NO SUPPORT OR MAINTENANCE
+────────────────────────────────────────
+
+The copyright holder is under no obligation to provide support,
+maintenance, updates, fixes, or continued availability of the Software.
+
+────────────────────────────────────────
+AI / MACHINE LEARNING
+────────────────────────────────────────
+
+The Software may not be used, in whole or in part, for training,
+fine-tuning, or benchmarking artificial intelligence or machine learning
+models without explicit prior written permission.
+
+────────────────────────────────────────
+WARRANTY DISCLAIMER
+────────────────────────────────────────
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+────────────────────────────────────────
+LIMITATION OF LIABILITY
+────────────────────────────────────────
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR
+THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+────────────────────────────────────────
+TRADEMARKS & PATENTS
+────────────────────────────────────────
+
+This licence does not grant any rights to trademarks, service marks, or
+patents.
