@@ -1,23 +1,22 @@
 # LICENSE
 
-Copyright (c) 2026 Sami Singh
+**Copyright (c) 2026 Sami Singh**  
+**ALL RIGHTS RESERVED**
 
-ALL RIGHTS RESERVED.
+This software and associated files (the “Software”) are the exclusive
+property of Sami Singh.
 
-────────────────────────────────────────
-PERMITTED USE
-────────────────────────────────────────
+---
 
-Permission is granted to view and use the Software for private,
-non-commercial, reference purposes only.
+## 1. Permitted Use
 
-────────────────────────────────────────
-RESTRICTED USE
-────────────────────────────────────────
+Permission is granted to **view and use the Software for private, non-commercial, reference purposes only**.
 
-Commercial use is NOT permitted unless explicit prior written permission
-is granted by the copyright holder and, where applicable, a paid
-commercial licence has been issued.
+---
+
+## 2. Restricted Use
+
+Commercial use is **NOT permitted** unless **explicit prior written permission** is granted by the copyright holder and, where applicable, a **paid commercial licence** has been issued.
 
 Commercial use includes, but is not limited to:
 - Use in any business, company, or organisation
@@ -34,58 +33,46 @@ No permission is granted to:
 - Sublicense or sell the Software
 - Fork or mirror the repository
 
-────────────────────────────────────────
-ATTRIBUTION
-────────────────────────────────────────
+---
 
-Any authorised use must include clear and visible credit to:
+## 3. Attribution
+
+Any authorised use must include clear and visible credit to:  
 **“Sami Singh”**
 
-────────────────────────────────────────
-COMMERCIAL LICENSING
-────────────────────────────────────────
+---
 
-Commercial licences may be granted at the sole discretion of the
-copyright holder and may require payment.
+## 4. Commercial Licensing
 
-Commercial licence terms, pricing, and conditions are determined
-separately and are not granted under this licence.
+Commercial licences may be granted **at the sole discretion** of the copyright holder and may require payment.  
+Commercial licence terms, pricing, and conditions are determined separately and are **not granted under this licence**.
 
-────────────────────────────────────────
-NO SUPPORT OR MAINTENANCE
-────────────────────────────────────────
+---
 
-The copyright holder is under no obligation to provide support,
-maintenance, updates, fixes, or continued availability of the Software.
+## 5. AI / Machine Learning
 
-────────────────────────────────────────
-AI / MACHINE LEARNING
-────────────────────────────────────────
+The Software may **NOT** be used, in whole or in part, for training, fine-tuning, or benchmarking artificial intelligence or machine learning models without explicit prior written permission.
 
-The Software may not be used, in whole or in part, for training,
-fine-tuning, or benchmarking artificial intelligence or machine learning
-models without explicit prior written permission.
+---
 
-────────────────────────────────────────
-WARRANTY DISCLAIMER
-────────────────────────────────────────
+## 6. No Support or Maintenance
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+The copyright holder is under **no obligation** to provide support, maintenance, updates, fixes, or continued availability of the Software.
 
-────────────────────────────────────────
-LIMITATION OF LIABILITY
-────────────────────────────────────────
+---
 
-IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
-OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
-OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR
-THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 7. Warranty Disclaimer
 
-────────────────────────────────────────
-TRADEMARKS & PATENTS
-────────────────────────────────────────
+THE SOFTWARE IS PROVIDED **“AS IS”**, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
 
-This licence does not grant any rights to trademarks, service marks, or
-patents.
+---
+
+## 8. Limitation of Liability
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+## 9. Trademarks & Patents
+
+This licence does **NOT** grant any rights to trademarks, service marks, or patents.
