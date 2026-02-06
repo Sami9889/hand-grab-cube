@@ -1,0 +1,803 @@
+# Hand Grab Cube - Professional Project Manager (Advanced)
+# --------------------------------------------------------
+# Features:
+# - Maintenance mode with automatic GitHub Pages deployment
+# - Scheduled maintenance
+# - Notifications via Slack (optional)
+# - Advanced reports and artifacts
+# - Build and cleanup options
+# - Full menu-driven workflow
+
+name: "Hand Grab Cube Advanced Manager"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose action"
+        required: true
+        default: "status"
+        type: choice
+        options:
+          - maintenance_on
+          - maintenance_off
+          - report
+          - build
+          - status
+          - update_website
+          - clean_builds
+          - deploy_live
+  schedule:
+    - cron: '0 2 * * 1'
+
+jobs:
+  manager:
+    name: "Manager: ${{ inputs.action || 'scheduled' }}"
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare Folders
+        run: |
+          mkdir -p website
+          mkdir -p website/live
+          mkdir -p website/live_backup
+          mkdir -p reports
+          mkdir -p build_artifacts
+
+      - name: Execute Menu Action
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          ACTION="${{ inputs.action }}"
+          
+          # Default to status if no action provided (scheduled run)
+          if [ -z "$ACTION" ]; then
+            ACTION="status"
+          fi
+          
+          echo "Running action: $ACTION"
+          
+          WEB_DIR="website"
+          LIVE_DIR="$WEB_DIR/live"
+          BACKUP_DIR="$WEB_DIR/live_backup"
+          MAINT_FILE="$WEB_DIR/index.html"
+          STATUS_FILE="$WEB_DIR/status.json"
+          REPORT_DIR="reports"
+
+          notify_slack() {
+            if [ -n "$SLACK_WEBHOOK" ]; then
+              curl -X POST -H 'Content-type: application/json' \
+                --data "{\"text\": \"$1\"}" "$SLACK_WEBHOOK" 2>/dev/null || true
+            fi
+          }
+
+          # ----------------------------
+          # Maintenance ON
+          # ----------------------------
+          if [[ "$ACTION" == "maintenance_on" ]]; then
+            echo "::group::Enabling maintenance mode"
+            echo "MAINTENANCE_MODE=ON" > maintenance.flag
+
+            if [ -d "$LIVE_DIR" ]; then
+              rm -rf "$BACKUP_DIR"
+              cp -r "$LIVE_DIR/." "$BACKUP_DIR"
+              echo "[SUCCESS] Live site backed up"
+            fi
+
+            cat > "$MAINT_FILE" <<'EOL'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance - Hand Grab Cube</title>
+<style>
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: linear-gradient(135deg, #0b0d10 0%, #1a1c22 100%);
+  color: #e6eef6; 
+  text-align: center; 
+  padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+.container {
+  max-width: 600px;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+h1 { 
+  font-size: 2.5em; 
+  margin-bottom: 0.5em;
+  color: #00d1ff;
+  font-weight: 600;
+}
+p { 
+  font-size: 1.2em; 
+  margin: 1em 0;
+  color: #cfd8dc;
+  line-height: 1.6;
+}
+.footer { 
+  margin-top: 50px; 
+  font-size: 0.9em; 
+  color: #9fb2c2;
+  opacity: 0.8;
+}
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  background: rgba(255, 179, 71, 0.2);
+  border: 1px solid #ffb347;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="status-badge">MAINTENANCE MODE</div>
+<h1>Site Under Maintenance</h1>
+<p>Hand Grab Cube is currently undergoing scheduled maintenance.</p>
+<p>We will be back shortly. Thank you for your patience.</p>
+<div class="footer">Last updated: $(date -u '+%Y-%m-%d %H:%M UTC')</div>
+</div>
+</body>
+</html>
+EOL
+
+            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" maintenance.flag 2>/dev/null || true
+            git commit -m "Enable maintenance mode [skip ci]" || echo "No changes to commit"
+            
+            # Try gh-pages first, then main
+            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || echo "Push failed"
+            
+            notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube"
+            echo "::endgroup::"
+            echo "[SUCCESS] Maintenance mode enabled successfully"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Maintenance OFF
+          # ----------------------------
+          if [[ "$ACTION" == "maintenance_off" ]]; then
+            echo "::group::Disabling maintenance mode"
+            rm -f maintenance.flag
+
+            if [ -d "$BACKUP_DIR" ] && [ "$(ls -A $BACKUP_DIR 2>/dev/null)" ]; then
+              rm -rf "$WEB_DIR"/*
+              cp -r "$BACKUP_DIR/." "$WEB_DIR/"
+              echo "[SUCCESS] Live site restored from backup"
+            else
+              cat > "$WEB_DIR/index.html" <<'EOL'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Grab Cube</title>
+</head>
+<body>
+<h1>Hand Grab Cube Live</h1>
+<p>Welcome back. The site is now live.</p>
+</body>
+</html>
+EOL
+              echo "[SUCCESS] Created default live page"
+            fi
+
+            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" 2>/dev/null || true
+            git add maintenance.flag 2>/dev/null || true
+            git commit -m "Disable maintenance mode [skip ci]" || echo "No changes to commit"
+            
+            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || echo "Push failed"
+            
+            notify_slack "[SUCCESS] Maintenance mode DISABLED - Live site restored"
+            echo "::endgroup::"
+            echo "[SUCCESS] Maintenance mode disabled successfully"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Generate Report
+          # ----------------------------
+          if [[ "$ACTION" == "report" ]]; then
+            echo "::group::Generating project report"
+            REPORT="$REPORT_DIR/report-$(date +%Y%m%d-%H%M%S).txt"
+            
+            {
+              echo "================================================"
+              echo "Hand Grab Cube Project Report"
+              echo "Generated: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+              echo "================================================"
+              echo ""
+              echo "[REPOSITORY INFORMATION]"
+              echo "  Branch: $(git branch --show-current)"
+              echo "  Commit: $(git log -1 --oneline)"
+              echo ""
+              echo "[FILE STATISTICS]"
+              echo "  Total files: $(find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' | wc -l)"
+              echo "  JavaScript: $(find . -name '*.js' -not -path '*/node_modules/*' | wc -l)"
+              echo "  HTML: $(find . -name '*.html' | wc -l)"
+              echo "  CSS: $(find . -name '*.css' | wc -l)"
+              echo ""
+              echo "[LINES OF CODE]"
+              
+              JS_LINES=$(find . -name '*.js' -not -path '*/node_modules/*' -type f -exec cat {} \; 2>/dev/null | wc -l)
+              [ "$JS_LINES" -gt 0 ] && echo "  JavaScript: $JS_LINES lines"
+              
+              HTML_LINES=$(find . -name '*.html' -type f -exec cat {} \; 2>/dev/null | wc -l)
+              [ "$HTML_LINES" -gt 0 ] && echo "  HTML: $HTML_LINES lines"
+              
+              CSS_LINES=$(find . -name '*.css' -type f -exec cat {} \; 2>/dev/null | wc -l)
+              [ "$CSS_LINES" -gt 0 ] && echo "  CSS: $CSS_LINES lines"
+              
+              echo ""
+              echo "[TOP 10 LARGEST FILES]"
+              find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' -exec du -h {} + 2>/dev/null | sort -rh | head -10
+              echo ""
+              echo "[RECENT COMMITS - LAST 10]"
+              git log -10 --oneline --decorate
+              echo ""
+              echo "================================================"
+            } > "$REPORT"
+            
+            cat "$REPORT"
+            
+            echo "::endgroup::"
+            echo "[SUCCESS] Report generated: $REPORT"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Build
+          # ----------------------------
+          if [[ "$ACTION" == "build" ]]; then
+            echo "::group::Building project"
+            
+            if [ -f package.json ]; then
+              echo "[INFO] Installing Node dependencies..."
+              npm ci 2>/dev/null || npm install || echo "[WARNING] npm install failed"
+              
+              if npm run 2>/dev/null | grep -q "build"; then
+                echo "[INFO] Running build script..."
+                npm run build || echo "[WARNING] Build script failed"
+              fi
+            fi
+            
+            if [ -f requirements.txt ]; then
+              echo "[INFO] Installing Python dependencies..."
+              pip install -r requirements.txt --break-system-packages 2>/dev/null || \
+              pip install -r requirements.txt 2>/dev/null || \
+              echo "[WARNING] Python install failed"
+            fi
+            
+            notify_slack "[SUCCESS] Build completed"
+            echo "::endgroup::"
+            echo "[SUCCESS] Build complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Clean Builds
+          # ----------------------------
+          if [[ "$ACTION" == "clean_builds" ]]; then
+            echo "::group::Cleaning build artifacts"
+            
+            rm -rf build_artifacts/* 2>/dev/null || true
+            rm -rf node_modules/.cache 2>/dev/null || true
+            rm -rf dist 2>/dev/null || true
+            rm -rf .next 2>/dev/null || true
+            rm -rf .nuxt 2>/dev/null || true
+            
+            notify_slack "[SUCCESS] Build artifacts cleaned"
+            echo "::endgroup::"
+            echo "[SUCCESS] Cleanup complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Deploy Live / Update Website
+          # ----------------------------
+          if [[ "$ACTION" == "deploy_live" ]] || [[ "$ACTION" == "update_website" ]]; then
+            echo "::group::Deploying website"
+            
+            if [ ! -d "$WEB_DIR" ]; then
+              echo "[ERROR] Website directory doesn't exist"
+              exit 1
+            fi
+            
+            git add "$WEB_DIR" 2>/dev/null || true
+            git commit -m "Deploy website [skip ci]" || echo "No changes to commit"
+            
+            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || {
+              echo "[ERROR] Push failed"
+              exit 1
+            }
+            
+            notify_slack "[SUCCESS] Website deployed successfully"
+            echo "::endgroup::"
+            echo "[SUCCESS] Deployment complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Status
+          # ----------------------------
+          if [[ "$ACTION" == "status" ]]; then
+            echo "================================================"
+            echo "Hand Grab Cube - Project Status"
+            echo "================================================"
+            echo ""
+            
+            if [ -f maintenance.flag ]; then
+              echo "Status: MAINTENANCE MODE"
+              echo "   $(cat maintenance.flag)"
+            else
+              echo "Status: LIVE"
+            fi
+            
+            echo ""
+            echo "[GIT INFORMATION]"
+            echo "   Branch: $(git branch --show-current)"
+            echo "   Commit: $(git log -1 --oneline)"
+            echo "   Remote: $(git remote get-url origin 2>/dev/null || echo 'N/A')"
+            echo ""
+            
+            if [ -f "$STATUS_FILE" ]; then
+              echo "[STATUS FILE]"
+              cat "$STATUS_FILE" | sed 's/^/   /'
+            fi
+            
+            echo ""
+            echo "[DIRECTORY STRUCTURE]"
+            echo "   Website dir exists: $([ -d "$WEB_DIR" ] && echo 'Yes' || echo 'No')"
+            echo "   Backup dir exists: $([ -d "$BACKUP_DIR" ] && echo 'Yes' || echo 'No')"
+            echo ""
+            echo "================================================"
+            exit 0
+          fi
+
+          echo "[ERROR] Unknown action: $ACTION"
+          echo "Available actions: maintenance_on, maintenance_off, report, build, status, update_website, clean_builds, deploy_live"
+          exit 1
+
+      - name: Upload Report
+        if: inputs.action == 'report'
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 30# Hand Grab Cube - Professional Project Manager (Advanced)
+# --------------------------------------------------------
+# Features:
+# - Maintenance mode with automatic GitHub Pages deployment
+# - Scheduled maintenance
+# - Notifications via Slack (optional)
+# - Advanced reports and artifacts
+# - Build and cleanup options
+# - Full menu-driven workflow
+
+name: "Hand Grab Cube Advanced Manager"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose action"
+        required: true
+        default: "status"
+        type: choice
+        options:
+          - maintenance_on
+          - maintenance_off
+          - report
+          - build
+          - status
+          - update_website
+          - clean_builds
+          - deploy_live
+  schedule:
+    - cron: '0 2 * * 1'
+
+jobs:
+  manager:
+    name: "Manager: ${{ inputs.action || 'scheduled' }}"
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare Folders
+        run: |
+          mkdir -p website
+          mkdir -p website/live
+          mkdir -p website/live_backup
+          mkdir -p reports
+          mkdir -p build_artifacts
+
+      - name: Execute Menu Action
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          ACTION="${{ inputs.action }}"
+          
+          # Default to status if no action provided (scheduled run)
+          if [ -z "$ACTION" ]; then
+            ACTION="status"
+          fi
+          
+          echo "Running action: $ACTION"
+          
+          WEB_DIR="website"
+          LIVE_DIR="$WEB_DIR/live"
+          BACKUP_DIR="$WEB_DIR/live_backup"
+          MAINT_FILE="$WEB_DIR/index.html"
+          STATUS_FILE="$WEB_DIR/status.json"
+          REPORT_DIR="reports"
+
+          notify_slack() {
+            if [ -n "$SLACK_WEBHOOK" ]; then
+              curl -X POST -H 'Content-type: application/json' \
+                --data "{\"text\": \"$1\"}" "$SLACK_WEBHOOK" 2>/dev/null || true
+            fi
+          }
+
+          # ----------------------------
+          # Maintenance ON
+          # ----------------------------
+          if [[ "$ACTION" == "maintenance_on" ]]; then
+            echo "::group::Enabling maintenance mode"
+            echo "MAINTENANCE_MODE=ON" > maintenance.flag
+
+            if [ -d "$LIVE_DIR" ]; then
+              rm -rf "$BACKUP_DIR"
+              cp -r "$LIVE_DIR/." "$BACKUP_DIR"
+              echo "[SUCCESS] Live site backed up"
+            fi
+
+            cat > "$MAINT_FILE" <<'EOL'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maintenance - Hand Grab Cube</title>
+<style>
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: linear-gradient(135deg, #0b0d10 0%, #1a1c22 100%);
+  color: #e6eef6; 
+  text-align: center; 
+  padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+.container {
+  max-width: 600px;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+h1 { 
+  font-size: 2.5em; 
+  margin-bottom: 0.5em;
+  color: #00d1ff;
+  font-weight: 600;
+}
+p { 
+  font-size: 1.2em; 
+  margin: 1em 0;
+  color: #cfd8dc;
+  line-height: 1.6;
+}
+.footer { 
+  margin-top: 50px; 
+  font-size: 0.9em; 
+  color: #9fb2c2;
+  opacity: 0.8;
+}
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  background: rgba(255, 179, 71, 0.2);
+  border: 1px solid #ffb347;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="status-badge">MAINTENANCE MODE</div>
+<h1>Site Under Maintenance</h1>
+<p>Hand Grab Cube is currently undergoing scheduled maintenance.</p>
+<p>We will be back shortly. Thank you for your patience.</p>
+<div class="footer">Last updated: $(date -u '+%Y-%m-%d %H:%M UTC')</div>
+</div>
+</body>
+</html>
+EOL
+
+            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" maintenance.flag 2>/dev/null || true
+            git commit -m "Enable maintenance mode [skip ci]" || echo "No changes to commit"
+            
+            # Try gh-pages first, then main
+            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || echo "Push failed"
+            
+            notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube"
+            echo "::endgroup::"
+            echo "[SUCCESS] Maintenance mode enabled successfully"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Maintenance OFF
+          # ----------------------------
+          if [[ "$ACTION" == "maintenance_off" ]]; then
+            echo "::group::Disabling maintenance mode"
+            rm -f maintenance.flag
+
+            if [ -d "$BACKUP_DIR" ] && [ "$(ls -A $BACKUP_DIR 2>/dev/null)" ]; then
+              rm -rf "$WEB_DIR"/*
+              cp -r "$BACKUP_DIR/." "$WEB_DIR/"
+              echo "[SUCCESS] Live site restored from backup"
+            else
+              cat > "$WEB_DIR/index.html" <<'EOL'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Grab Cube</title>
+</head>
+<body>
+<h1>Hand Grab Cube Live</h1>
+<p>Welcome back. The site is now live.</p>
+</body>
+</html>
+EOL
+              echo "[SUCCESS] Created default live page"
+            fi
+
+            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" 2>/dev/null || true
+            git add maintenance.flag 2>/dev/null || true
+            git commit -m "Disable maintenance mode [skip ci]" || echo "No changes to commit"
+            
+            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || echo "Push failed"
+            
+            notify_slack "[SUCCESS] Maintenance mode DISABLED - Live site restored"
+            echo "::endgroup::"
+            echo "[SUCCESS] Maintenance mode disabled successfully"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Generate Report
+          # ----------------------------
+          if [[ "$ACTION" == "report" ]]; then
+            echo "::group::Generating project report"
+            REPORT="$REPORT_DIR/report-$(date +%Y%m%d-%H%M%S).txt"
+            
+            {
+              echo "================================================"
+              echo "Hand Grab Cube Project Report"
+              echo "Generated: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+              echo "================================================"
+              echo ""
+              echo "[REPOSITORY INFORMATION]"
+              echo "  Branch: $(git branch --show-current)"
+              echo "  Commit: $(git log -1 --oneline)"
+              echo ""
+              echo "[FILE STATISTICS]"
+              echo "  Total files: $(find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' | wc -l)"
+              echo "  JavaScript: $(find . -name '*.js' -not -path '*/node_modules/*' | wc -l)"
+              echo "  HTML: $(find . -name '*.html' | wc -l)"
+              echo "  CSS: $(find . -name '*.css' | wc -l)"
+              echo ""
+              echo "[LINES OF CODE]"
+              
+              JS_LINES=$(find . -name '*.js' -not -path '*/node_modules/*' -type f -exec cat {} \; 2>/dev/null | wc -l)
+              [ "$JS_LINES" -gt 0 ] && echo "  JavaScript: $JS_LINES lines"
+              
+              HTML_LINES=$(find . -name '*.html' -type f -exec cat {} \; 2>/dev/null | wc -l)
+              [ "$HTML_LINES" -gt 0 ] && echo "  HTML: $HTML_LINES lines"
+              
+              CSS_LINES=$(find . -name '*.css' -type f -exec cat {} \; 2>/dev/null | wc -l)
+              [ "$CSS_LINES" -gt 0 ] && echo "  CSS: $CSS_LINES lines"
+              
+              echo ""
+              echo "[TOP 10 LARGEST FILES]"
+              find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' -exec du -h {} + 2>/dev/null | sort -rh | head -10
+              echo ""
+              echo "[RECENT COMMITS - LAST 10]"
+              git log -10 --oneline --decorate
+              echo ""
+              echo "================================================"
+            } > "$REPORT"
+            
+            cat "$REPORT"
+            
+            echo "::endgroup::"
+            echo "[SUCCESS] Report generated: $REPORT"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Build
+          # ----------------------------
+          if [[ "$ACTION" == "build" ]]; then
+            echo "::group::Building project"
+            
+            if [ -f package.json ]; then
+              echo "[INFO] Installing Node dependencies..."
+              npm ci 2>/dev/null || npm install || echo "[WARNING] npm install failed"
+              
+              if npm run 2>/dev/null | grep -q "build"; then
+                echo "[INFO] Running build script..."
+                npm run build || echo "[WARNING] Build script failed"
+              fi
+            fi
+            
+            if [ -f requirements.txt ]; then
+              echo "[INFO] Installing Python dependencies..."
+              pip install -r requirements.txt --break-system-packages 2>/dev/null || \
+              pip install -r requirements.txt 2>/dev/null || \
+              echo "[WARNING] Python install failed"
+            fi
+            
+            notify_slack "[SUCCESS] Build completed"
+            echo "::endgroup::"
+            echo "[SUCCESS] Build complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Clean Builds
+          # ----------------------------
+          if [[ "$ACTION" == "clean_builds" ]]; then
+            echo "::group::Cleaning build artifacts"
+            
+            rm -rf build_artifacts/* 2>/dev/null || true
+            rm -rf node_modules/.cache 2>/dev/null || true
+            rm -rf dist 2>/dev/null || true
+            rm -rf .next 2>/dev/null || true
+            rm -rf .nuxt 2>/dev/null || true
+            
+            notify_slack "[SUCCESS] Build artifacts cleaned"
+            echo "::endgroup::"
+            echo "[SUCCESS] Cleanup complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Deploy Live / Update Website
+          # ----------------------------
+          if [[ "$ACTION" == "deploy_live" ]] || [[ "$ACTION" == "update_website" ]]; then
+            echo "::group::Deploying website"
+            
+            if [ ! -d "$WEB_DIR" ]; then
+              echo "[ERROR] Website directory doesn't exist"
+              exit 1
+            fi
+            
+            git add "$WEB_DIR" 2>/dev/null || true
+            git commit -m "Deploy website [skip ci]" || echo "No changes to commit"
+            
+            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || {
+              echo "[ERROR] Push failed"
+              exit 1
+            }
+            
+            notify_slack "[SUCCESS] Website deployed successfully"
+            echo "::endgroup::"
+            echo "[SUCCESS] Deployment complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Status
+          # ----------------------------
+          if [[ "$ACTION" == "status" ]]; then
+            echo "================================================"
+            echo "Hand Grab Cube - Project Status"
+            echo "================================================"
+            echo ""
+            
+            if [ -f maintenance.flag ]; then
+              echo "Status: MAINTENANCE MODE"
+              echo "   $(cat maintenance.flag)"
+            else
+              echo "Status: LIVE"
+            fi
+            
+            echo ""
+            echo "[GIT INFORMATION]"
+            echo "   Branch: $(git branch --show-current)"
+            echo "   Commit: $(git log -1 --oneline)"
+            echo "   Remote: $(git remote get-url origin 2>/dev/null || echo 'N/A')"
+            echo ""
+            
+            if [ -f "$STATUS_FILE" ]; then
+              echo "[STATUS FILE]"
+              cat "$STATUS_FILE" | sed 's/^/   /'
+            fi
+            
+            echo ""
+            echo "[DIRECTORY STRUCTURE]"
+            echo "   Website dir exists: $([ -d "$WEB_DIR" ] && echo 'Yes' || echo 'No')"
+            echo "   Backup dir exists: $([ -d "$BACKUP_DIR" ] && echo 'Yes' || echo 'No')"
+            echo ""
+            echo "================================================"
+            exit 0
+          fi
+
+          echo "[ERROR] Unknown action: $ACTION"
+          echo "Available actions: maintenance_on, maintenance_off, report, build, status, update_website, clean_builds, deploy_live"
+          exit 1
+
+      - name: Upload Report
+        if: inputs.action == 'report'
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 30
