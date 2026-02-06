@@ -28,10 +28,36 @@
       
       // Handle unhandled promise rejections from Sentry
       window.addEventListener('unhandledrejection', (e) => {
-        if (e.reason && (String(e.reason).includes('sentry') || String(e.reason).includes('ingest.de.sentry.io'))) {
-          console.warn('[WARN] Sentry promise rejection caught and suppressed:', e.reason);
-          e.preventDefault();
-          return true;
+        if (e.reason) {
+          const reasonStr = String(e.reason);
+
+          // Quick textual check for generic Sentry-related reasons
+          let isSentryReason = reasonStr.includes('sentry');
+
+          // Additionally, handle reasons that look like URLs to the Sentry ingest host
+          if (!isSentryReason && reasonStr.includes('ingest.de.sentry.io')) {
+            try {
+              let url;
+              try {
+                url = new URL(reasonStr);
+              } catch (_) {
+                // If the reason is not an absolute URL, try interpreting it as HTTPS URL
+                url = new URL('https://' + reasonStr.replace(/^\/+/, ''));
+              }
+              const allowedHosts = ['ingest.de.sentry.io'];
+              if (allowedHosts.includes(url.host)) {
+                isSentryReason = true;
+              }
+            } catch (_) {
+              // If parsing fails, do not treat it as a Sentry URL
+            }
+          }
+
+          if (isSentryReason) {
+            console.warn('[WARN] Sentry promise rejection caught and suppressed:', e.reason);
+            e.preventDefault();
+            return true;
+          }
         }
       }, true);
     })();
