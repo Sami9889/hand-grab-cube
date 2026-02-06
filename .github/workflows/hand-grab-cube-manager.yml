@@ -84,15 +84,34 @@ jobs:
           # ----------------------------
           if [[ "$ACTION" == "maintenance_on" ]]; then
             echo "::group::Enabling maintenance mode"
-            echo "MAINTENANCE_MODE=ON" > maintenance.flag
-
-            if [ -d "$LIVE_DIR" ]; then
-              rm -rf "$BACKUP_DIR"
-              cp -r "$LIVE_DIR/." "$BACKUP_DIR"
-              echo "[SUCCESS] Live site backed up"
+            
+            # Store current branch
+            CURRENT_BRANCH=$(git branch --show-current)
+            
+            # Check if gh-pages branch exists
+            if git show-ref --verify --quiet refs/heads/gh-pages; then
+              echo "[INFO] Switching to gh-pages branch"
+              git checkout gh-pages
+            elif git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+              echo "[INFO] Checking out remote gh-pages branch"
+              git checkout -b gh-pages origin/gh-pages
+            else
+              echo "[INFO] Creating new gh-pages branch"
+              git checkout --orphan gh-pages
+              git rm -rf . 2>/dev/null || true
             fi
-
-            cat > "$MAINT_FILE" << 'HEREDOC_EOF'
+            
+            # Create maintenance flag
+            echo "MAINTENANCE_MODE=ON" > maintenance.flag
+            
+            # Backup existing index.html if it exists
+            if [ -f "index.html" ]; then
+              cp index.html index.html.backup
+              echo "[SUCCESS] Backed up existing index.html"
+            fi
+            
+            # Create maintenance page at root
+            cat > "index.html" << 'HEREDOC_EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -163,16 +182,21 @@ jobs:
           </html>
           HEREDOC_EOF
 
-            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
-
-            git add "$WEB_DIR" maintenance.flag 2>/dev/null || true
-            git commit -m "Enable maintenance mode [skip ci]" || echo "No changes to commit"
+            # Create status file
+            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "status.json"
             
-            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || echo "Push failed"
+            # Commit and push to gh-pages
+            git add index.html maintenance.flag status.json index.html.backup 2>/dev/null || true
+            git commit -m "Enable maintenance mode" || echo "No changes to commit"
+            git push origin gh-pages --force
+            
+            # Return to original branch
+            git checkout "$CURRENT_BRANCH" 2>/dev/null || true
             
             notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube"
             echo "::endgroup::"
             echo "[SUCCESS] Maintenance mode enabled successfully"
+            echo "[INFO] Maintenance page deployed to GitHub Pages"
             exit 0
           fi
 
@@ -181,14 +205,30 @@ jobs:
           # ----------------------------
           if [[ "$ACTION" == "maintenance_off" ]]; then
             echo "::group::Disabling maintenance mode"
-            rm -f maintenance.flag
-
-            if [ -d "$BACKUP_DIR" ] && [ "$(ls -A $BACKUP_DIR 2>/dev/null)" ]; then
-              rm -rf "$WEB_DIR"/*
-              cp -r "$BACKUP_DIR/." "$WEB_DIR/"
-              echo "[SUCCESS] Live site restored from backup"
+            
+            # Store current branch
+            CURRENT_BRANCH=$(git branch --show-current)
+            
+            # Switch to gh-pages
+            if git show-ref --verify --quiet refs/heads/gh-pages; then
+              git checkout gh-pages
+            elif git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+              git checkout -b gh-pages origin/gh-pages
             else
-              cat > "$WEB_DIR/index.html" << 'HEREDOC_EOF'
+              echo "[ERROR] gh-pages branch does not exist"
+              exit 1
+            fi
+            
+            # Remove maintenance flag
+            rm -f maintenance.flag
+            
+            # Restore backup if it exists
+            if [ -f "index.html.backup" ]; then
+              mv index.html.backup index.html
+              echo "[SUCCESS] Restored index.html from backup"
+            else
+              # Create default live page
+              cat > "index.html" << 'HEREDOC_EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -205,17 +245,22 @@ jobs:
               echo "[SUCCESS] Created default live page"
             fi
 
-            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+            # Update status file
+            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "status.json"
 
-            git add "$WEB_DIR" 2>/dev/null || true
+            # Commit and push
+            git add index.html status.json 2>/dev/null || true
             git add maintenance.flag 2>/dev/null || true
-            git commit -m "Disable maintenance mode [skip ci]" || echo "No changes to commit"
+            git commit -m "Disable maintenance mode - restore live site" || echo "No changes to commit"
+            git push origin gh-pages --force
             
-            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || echo "Push failed"
+            # Return to original branch
+            git checkout "$CURRENT_BRANCH" 2>/dev/null || true
             
             notify_slack "[SUCCESS] Maintenance mode DISABLED - Live site restored"
             echo "::endgroup::"
             echo "[SUCCESS] Maintenance mode disabled successfully"
+            echo "[INFO] Live site deployed to GitHub Pages"
             exit 0
           fi
 
