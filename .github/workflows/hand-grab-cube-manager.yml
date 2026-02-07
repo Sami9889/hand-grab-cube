@@ -1,10 +1,5 @@
-# Hand Grab Cube - Professional Project Manager (Advanced)
-# --------------------------------------------------------
-# This workflow ONLY manages files in the website/ directory
-# It does NOT create or modify gh-pages branch
-# It does NOT delete your source code
 
-name: "Hand Grab Cube Advanced Manager"
+name: "Hand Grab Cube Manager"
 
 on:
   workflow_dispatch:
