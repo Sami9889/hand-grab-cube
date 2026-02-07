@@ -33,6 +33,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Git
         run: |
@@ -120,8 +121,17 @@ jobs:
             echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
 
             git add "$WEB_DIR" maintenance.flag 2>/dev/null || true
-            git commit -m "Enable maintenance mode [skip ci]" || echo "No changes to commit"
-            git push origin main
+            
+            if git diff --cached --quiet; then
+              echo "[INFO] No changes to commit"
+            else
+              git commit -m "Enable maintenance mode [skip ci]"
+              git pull --rebase origin main || true
+              git push origin main || {
+                echo "[ERROR] Failed to push changes"
+                exit 1
+              }
+            fi
             
             notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube"
             echo "::endgroup::"
@@ -162,8 +172,17 @@ jobs:
 
             git add "$WEB_DIR" 2>/dev/null || true
             git add maintenance.flag 2>/dev/null || true
-            git commit -m "Disable maintenance mode [skip ci]" || echo "No changes to commit"
-            git push origin main
+            
+            if git diff --cached --quiet; then
+              echo "[INFO] No changes to commit"
+            else
+              git commit -m "Disable maintenance mode [skip ci]"
+              git pull --rebase origin main || true
+              git push origin main || {
+                echo "[ERROR] Failed to push changes"
+                exit 1
+              }
+            fi
             
             notify_slack "[SUCCESS] Maintenance mode DISABLED - Live site restored"
             echo "::endgroup::"
