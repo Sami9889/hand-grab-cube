@@ -1,5 +1,10 @@
+# Hand Grab Cube - Professional Project Manager (Advanced)
+# --------------------------------------------------------
+# This workflow ONLY manages files in the website/ directory
+# It does NOT create or modify gh-pages branch
+# It does NOT delete your source code
 
-name: "Hand Grab Cube Manager"
+name: "Hand Grab Cube Advanced Manager"
 
 on:
   workflow_dispatch:
@@ -15,9 +20,7 @@ on:
           - report
           - build
           - status
-          - update_website
           - clean_builds
-          - deploy_live
   schedule:
     - cron: '0 2 * * 1'
 
@@ -28,15 +31,13 @@ jobs:
     
     permissions:
       contents: write
-      pages: write
-      id-token: write
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
 
       - name: Setup Git
         run: |
@@ -58,7 +59,6 @@ jobs:
         run: |
           ACTION="${{ inputs.action }}"
           
-          # Default to status if no action provided (scheduled run)
           if [ -z "$ACTION" ]; then
             ACTION="status"
           fi
@@ -84,34 +84,17 @@ jobs:
           # ----------------------------
           if [[ "$ACTION" == "maintenance_on" ]]; then
             echo "::group::Enabling maintenance mode"
-            
-            # Store current branch
-            CURRENT_BRANCH=$(git branch --show-current)
-            
-            # Check if gh-pages branch exists
-            if git show-ref --verify --quiet refs/heads/gh-pages; then
-              echo "[INFO] Switching to gh-pages branch"
-              git checkout gh-pages
-            elif git ls-remote --heads origin gh-pages | grep -q gh-pages; then
-              echo "[INFO] Checking out remote gh-pages branch"
-              git checkout -b gh-pages origin/gh-pages
-            else
-              echo "[INFO] Creating new gh-pages branch"
-              git checkout --orphan gh-pages
-              git rm -rf . 2>/dev/null || true
-            fi
-            
-            # Create maintenance flag
             echo "MAINTENANCE_MODE=ON" > maintenance.flag
-            
-            # Backup existing index.html if it exists
-            if [ -f "index.html" ]; then
-              cp index.html index.html.backup
-              echo "[SUCCESS] Backed up existing index.html"
+
+            if [ -d "$LIVE_DIR" ] && [ "$(ls -A $LIVE_DIR 2>/dev/null)" ]; then
+              rm -rf "$BACKUP_DIR"
+              cp -r "$LIVE_DIR/." "$BACKUP_DIR"
+              echo "[SUCCESS] Live site backed up"
             fi
+
+            CURRENT_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
             
-            # Create maintenance page at root
-            cat > "index.html" << 'HEREDOC_EOF'
+            cat > "$MAINT_FILE" <<MAINTENANCEPAGE
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -119,55 +102,12 @@ jobs:
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Maintenance - Hand Grab Cube</title>
           <style>
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: linear-gradient(135deg, #0b0d10 0%, #1a1c22 100%);
-            color: #e6eef6; 
-            text-align: center; 
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-          }
-          .container {
-            max-width: 600px;
-            padding: 40px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-          }
-          h1 { 
-            font-size: 2.5em; 
-            margin-bottom: 0.5em;
-            color: #00d1ff;
-            font-weight: 600;
-          }
-          p { 
-            font-size: 1.2em; 
-            margin: 1em 0;
-            color: #cfd8dc;
-            line-height: 1.6;
-          }
-          .footer { 
-            margin-top: 50px; 
-            font-size: 0.9em; 
-            color: #9fb2c2;
-            opacity: 0.8;
-          }
-          .status-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            background: rgba(255, 179, 71, 0.2);
-            border: 1px solid #ffb347;
-            border-radius: 6px;
-            font-size: 0.9em;
-            font-weight: 600;
-            margin-bottom: 20px;
-          }
+          body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:linear-gradient(135deg,#0b0d10 0%,#1a1c22 100%);color:#e6eef6;text-align:center;padding:20px;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0}
+          .container{max-width:600px;padding:40px;background:rgba(255,255,255,0.05);border-radius:16px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1)}
+          h1{font-size:2.5em;margin-bottom:0.5em;color:#00d1ff;font-weight:600}
+          p{font-size:1.2em;margin:1em 0;color:#cfd8dc;line-height:1.6}
+          .footer{margin-top:50px;font-size:0.9em;color:#9fb2c2;opacity:0.8}
+          .status-badge{display:inline-block;padding:8px 16px;background:rgba(255,179,71,0.2);border:1px solid #ffb347;border-radius:6px;font-size:0.9em;font-weight:600;margin-bottom:20px}
           </style>
           </head>
           <body>
@@ -176,27 +116,21 @@ jobs:
           <h1>Site Under Maintenance</h1>
           <p>Hand Grab Cube is currently undergoing scheduled maintenance.</p>
           <p>We will be back shortly. Thank you for your patience.</p>
-          <div class="footer">Last updated: $(date -u '+%Y-%m-%d %H:%M UTC')</div>
+          <div class="footer">Last updated: ${CURRENT_DATE}</div>
           </div>
           </body>
           </html>
-          HEREDOC_EOF
+          MAINTENANCEPAGE
 
-            # Create status file
-            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "status.json"
-            
-            # Commit and push to gh-pages
-            git add index.html maintenance.flag status.json index.html.backup 2>/dev/null || true
-            git commit -m "Enable maintenance mode" || echo "No changes to commit"
-            git push origin gh-pages --force
-            
-            # Return to original branch
-            git checkout "$CURRENT_BRANCH" 2>/dev/null || true
+            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" maintenance.flag 2>/dev/null || true
+            git commit -m "Enable maintenance mode [skip ci]" || echo "No changes to commit"
+            git push origin main
             
             notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube"
             echo "::endgroup::"
             echo "[SUCCESS] Maintenance mode enabled successfully"
-            echo "[INFO] Maintenance page deployed to GitHub Pages"
             exit 0
           fi
 
@@ -205,30 +139,14 @@ jobs:
           # ----------------------------
           if [[ "$ACTION" == "maintenance_off" ]]; then
             echo "::group::Disabling maintenance mode"
-            
-            # Store current branch
-            CURRENT_BRANCH=$(git branch --show-current)
-            
-            # Switch to gh-pages
-            if git show-ref --verify --quiet refs/heads/gh-pages; then
-              git checkout gh-pages
-            elif git ls-remote --heads origin gh-pages | grep -q gh-pages; then
-              git checkout -b gh-pages origin/gh-pages
-            else
-              echo "[ERROR] gh-pages branch does not exist"
-              exit 1
-            fi
-            
-            # Remove maintenance flag
             rm -f maintenance.flag
-            
-            # Restore backup if it exists
-            if [ -f "index.html.backup" ]; then
-              mv index.html.backup index.html
-              echo "[SUCCESS] Restored index.html from backup"
+
+            if [ -d "$BACKUP_DIR" ] && [ "$(ls -A $BACKUP_DIR 2>/dev/null)" ]; then
+              rm -rf "$WEB_DIR"/*
+              cp -r "$BACKUP_DIR/." "$WEB_DIR/"
+              echo "[SUCCESS] Live site restored from backup"
             else
-              # Create default live page
-              cat > "index.html" << 'HEREDOC_EOF'
+              cat > "$WEB_DIR/index.html" <<LIVEPAGE
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -241,26 +159,20 @@ jobs:
           <p>Welcome back. The site is now live.</p>
           </body>
           </html>
-          HEREDOC_EOF
+          LIVEPAGE
               echo "[SUCCESS] Created default live page"
             fi
 
-            # Update status file
-            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "status.json"
+            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
 
-            # Commit and push
-            git add index.html status.json 2>/dev/null || true
+            git add "$WEB_DIR" 2>/dev/null || true
             git add maintenance.flag 2>/dev/null || true
-            git commit -m "Disable maintenance mode - restore live site" || echo "No changes to commit"
-            git push origin gh-pages --force
-            
-            # Return to original branch
-            git checkout "$CURRENT_BRANCH" 2>/dev/null || true
+            git commit -m "Disable maintenance mode [skip ci]" || echo "No changes to commit"
+            git push origin main
             
             notify_slack "[SUCCESS] Maintenance mode DISABLED - Live site restored"
             echo "::endgroup::"
             echo "[SUCCESS] Maintenance mode disabled successfully"
-            echo "[INFO] Live site deployed to GitHub Pages"
             exit 0
           fi
 
@@ -271,19 +183,12 @@ jobs:
             echo "::group::Generating project report"
             REPORT="$REPORT_DIR/report-$(date +%Y%m%d-%H%M%S).txt"
             
-            cat > "$REPORT" << 'HEREDOC_EOF'
-          ================================================
-          Hand Grab Cube Project Report
-          HEREDOC_EOF
-            
+            echo "================================================" > "$REPORT"
+            echo "Hand Grab Cube Project Report" >> "$REPORT"
             echo "Generated: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> "$REPORT"
-            
-            cat >> "$REPORT" << 'HEREDOC_EOF'
-          ================================================
-
-          [REPOSITORY INFORMATION]
-          HEREDOC_EOF
-            
+            echo "================================================" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "[REPOSITORY INFORMATION]" >> "$REPORT"
             echo "  Branch: $(git branch --show-current)" >> "$REPORT"
             echo "  Commit: $(git log -1 --oneline)" >> "$REPORT"
             echo "" >> "$REPORT"
@@ -368,31 +273,6 @@ jobs:
           fi
 
           # ----------------------------
-          # Deploy Live / Update Website
-          # ----------------------------
-          if [[ "$ACTION" == "deploy_live" ]] || [[ "$ACTION" == "update_website" ]]; then
-            echo "::group::Deploying website"
-            
-            if [ ! -d "$WEB_DIR" ]; then
-              echo "[ERROR] Website directory doesn't exist"
-              exit 1
-            fi
-            
-            git add "$WEB_DIR" 2>/dev/null || true
-            git commit -m "Deploy website [skip ci]" || echo "No changes to commit"
-            
-            git push origin HEAD:gh-pages 2>/dev/null || git push origin HEAD:main || {
-              echo "[ERROR] Push failed"
-              exit 1
-            }
-            
-            notify_slack "[SUCCESS] Website deployed successfully"
-            echo "::endgroup::"
-            echo "[SUCCESS] Deployment complete"
-            exit 0
-          fi
-
-          # ----------------------------
           # Status
           # ----------------------------
           if [[ "$ACTION" == "status" ]]; then
@@ -430,7 +310,7 @@ jobs:
           fi
 
           echo "[ERROR] Unknown action: $ACTION"
-          echo "Available actions: maintenance_on, maintenance_off, report, build, status, update_website, clean_builds, deploy_live"
+          echo "Available actions: maintenance_on, maintenance_off, report, build, status, clean_builds"
           exit 1
 
       - name: Upload Report
