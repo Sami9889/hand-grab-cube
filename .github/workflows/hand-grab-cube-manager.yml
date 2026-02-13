@@ -57,6 +57,7 @@ jobs:
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_REVIEWER: "Sami9889"
         run: |
           ACTION="${{ inputs.action }}"
           
@@ -81,20 +82,52 @@ jobs:
           }
 
           # Helper: commit to a feature branch and open a PR instead of pushing to protected main
+          # Create PR helper — push only to a pre-created persistent branch (website/automation)
           create_branch_and_pr() {
             local BRANCH="$1"; shift
-            git checkout -b "$BRANCH"
+            local PR_TITLE="$1"; shift || true
+
+            # ensure branch exists on remote (repo may restrict branch creations)
+            if ! git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              echo "[ERROR] Remote branch '$BRANCH' does not exist or branch creation is restricted."
+              echo "Please create the branch 'website/automation' in the repository or relax branch creation rules for the workflow."
+              return 2
+            fi
+
+            # update local copy of the branch
+            git fetch origin "$BRANCH":"$BRANCH" || { echo "[ERROR] Failed to fetch remote branch $BRANCH"; return 1; }
+            git checkout "$BRANCH"
             git add -A || true
             git commit -m "Website: $BRANCH [skip ci]" || true
-            git push --set-upstream origin "$BRANCH" || { echo "[ERROR] Failed to push $BRANCH"; return 1; }
+            git push origin "$BRANCH" || { echo "[ERROR] Failed to push to $BRANCH"; return 1; }
 
-            # create PR via REST API
-            local PR_TITLE="$2"; shift
+            # create PR and request a reviewer (use gh if available, otherwise REST API)
             local PR_BODY="Automated update produced by hand-grab-cube manager workflow: $BRANCH"
-            curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
-              -d "{\"title\": \"${PR_TITLE}\", \"head\": \"${BRANCH}\", \"base\": \"main\", \"body\": \"${PR_BODY}\" }" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" >/dev/null || true
-            echo "[INFO] Created PR for $BRANCH"
+            if command -v gh >/dev/null 2>&1; then
+              gh pr create --title "${PR_TITLE}" --body "${PR_BODY}" --base main --head "${BRANCH}" --reviewer "$DEFAULT_REVIEWER" >/dev/null 2>&1 || true
+              echo "[INFO] PR created/updated (gh) and reviewer requested: $DEFAULT_REVIEWER"
+            else
+              # create PR via REST API and request reviewer
+              local PR_JSON
+              PR_JSON=$(curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
+                -d "{\"title\": \"${PR_TITLE}\", \"head\": \"${BRANCH}\", \"base\": \"main\", \"body\": \"${PR_BODY}\" }" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls") || true
+              local PR_NUMBER
+              if command -v jq >/dev/null 2>&1; then
+                PR_NUMBER=$(printf "%s" "$PR_JSON" | jq -r '.number')
+              else
+                PR_NUMBER=$(printf "%s" "$PR_JSON" | grep -m1 -o '"number":[0-9]*' | cut -d: -f2 | tr -d ' ')
+              fi
+              if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+                curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
+                  -d "{\"reviewers\": [\"${DEFAULT_REVIEWER}\"] }" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/requested_reviewers" >/dev/null 2>&1 || true
+                echo "[INFO] PR created via REST and reviewer requested: $DEFAULT_REVIEWER (PR #${PR_NUMBER})"
+              else
+                echo "[WARN] PR creation returned no PR number; reviewer not requested"
+              fi
+            fi
+            echo "[INFO] Updated branch and ensured PR exists for $BRANCH"
             return 0
           }
 
@@ -148,9 +181,9 @@ jobs:
             if git diff --cached --quiet; then
               echo "[INFO] No changes to commit"
             else
-              # create branch and open PR instead of pushing to protected main
-              BRANCH_NAME="website/maintenance-$(date -u '+%Y%m%d-%H%M%S')"
-              create_branch_and_pr "$BRANCH_NAME" "Website: maintenance update" || { echo "[ERROR] Branch/PR creation failed"; exit 1; }
+              # push to a persistent branch (must already exist): website/automation
+              BRANCH_NAME="website/automation"
+              create_branch_and_pr "$BRANCH_NAME" "Website: maintenance update" || { echo "[ERROR] Branch/PR creation failed — ensure 'website/automation' exists or update repo rules"; exit 1; }
             fi
             
             notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube (PR created)"
@@ -173,8 +206,8 @@ jobs:
               if git diff --cached --quiet; then
                 echo "[INFO] No feature-flag changes to commit"
               else
-                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
-                create_branch_and_pr "$BRANCH_NAME" "Website: enable outline feature" || echo "[WARN] Failed to create PR for outline flag"
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: enable outline feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
               fi
               notify_slack "[INFO] Outline feature ENABLED (PR created if required)"
               echo "[SUCCESS] Outline enabled"
@@ -186,8 +219,8 @@ jobs:
               if git diff --cached --quiet; then
                 echo "[INFO] No feature-flag changes to commit"
               else
-                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
-                create_branch_and_pr "$BRANCH_NAME" "Website: disable outline feature" || echo "[WARN] Failed to create PR for outline flag"
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: disable outline feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
               fi
               notify_slack "[INFO] Outline feature DISABLED (PR created if required)"
               echo "[SUCCESS] Outline disabled"
@@ -209,8 +242,8 @@ jobs:
               if git diff --cached --quiet; then
                 echo "[INFO] No feature-flag changes to commit"
               else
-                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
-                create_branch_and_pr "$BRANCH_NAME" "Website: enable debug feature" || echo "[WARN] Failed to create PR for debug flag"
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: enable debug feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
               fi
               notify_slack "[INFO] Debug feature ENABLED (PR created if required)"
               echo "[SUCCESS] Debug enabled"
@@ -222,8 +255,8 @@ jobs:
               if git diff --cached --quiet; then
                 echo "[INFO] No feature-flag changes to commit"
               else
-                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
-                create_branch_and_pr "$BRANCH_NAME" "Website: disable debug feature" || echo "[WARN] Failed to create PR for debug flag"
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: disable debug feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
               fi
               notify_slack "[INFO] Debug feature DISABLED (PR created if required)"
               echo "[SUCCESS] Debug disabled"
