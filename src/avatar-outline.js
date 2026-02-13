@@ -11,6 +11,7 @@ export function addOutline(mesh, color = 0x00ff00, thickness = 0.025) {
   outline.renderOrder = 1;
   mesh.add(outline);
   mesh.userData.outline = outline;
+  try { console.debug('[outline] added', { mesh: mesh.name || mesh.id, color, thickness }); } catch(e){}
   return outline;
 }
 
@@ -18,5 +19,6 @@ export function removeOutline(mesh) {
   if (mesh.userData.outline) {
     mesh.remove(mesh.userData.outline);
     delete mesh.userData.outline;
+    try { console.debug('[outline] removed', { mesh: mesh.name || mesh.id }); } catch(e){}
   }
 }

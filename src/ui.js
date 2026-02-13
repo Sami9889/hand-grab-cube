@@ -7,7 +7,8 @@ export function createUI(containerId='ui'){
       lowPerf: document.getElementById('lowPerf'),
       maxObjects: document.getElementById('maxObjects'),
       snapshot: document.getElementById('snapshotBtn'),
-      useTestVideo: document.getElementById('useTestVideo')
+      useTestVideo: document.getElementById('useTestVideo'),
+      debug: document.getElementById('debugToggle')
     },
     extras: {
       showHands: document.getElementById('showHands'),

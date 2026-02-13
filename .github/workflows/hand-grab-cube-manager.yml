@@ -16,6 +16,10 @@ on:
           - build
           - status
           - clean_builds
+          - enable_outline
+          - disable_outline
+          - enable_debug
+          - disable_debug
   schedule:
     - cron: '0 2 * * 1'
 
@@ -138,6 +142,64 @@ jobs:
             echo "[SUCCESS] Maintenance mode enabled successfully"
             exit 0
           fi
+
+          # ----------------------------
+          # Enable/Disable UI Outline Feature
+          # ----------------------------
+          if [[ "$ACTION" == "enable_outline" || "$ACTION" == "disable_outline" ]]; then
+            echo "::group::Toggling outline feature - $ACTION"
+            mkdir -p "$WEB_DIR"
+            FLAGS_FILE="$WEB_DIR/feature_flags.json"
+            if [[ "$ACTION" == "enable_outline" ]]; then
+              jq '. + {"outline": true}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"outline": true}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              git commit -m "Enable UI/hand outline feature [skip ci]" || true
+              git push origin main || true
+              notify_slack "[INFO] Outline feature ENABLED"
+              echo "[SUCCESS] Outline enabled"
+              exit 0
+            else
+              jq '. + {"outline": false}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"outline": false}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              git commit -m "Disable UI/hand outline feature [skip ci]" || true
+              git push origin main || true
+              notify_slack "[INFO] Outline feature DISABLED"
+              echo "[SUCCESS] Outline disabled"
+              exit 0
+            fi
+          fi
+
+          # ----------------------------
+          # Enable/Disable Debug Feature
+          # ----------------------------
+          if [[ "$ACTION" == "enable_debug" || "$ACTION" == "disable_debug" ]]; then
+            echo "::group::Toggling debug feature - $ACTION"
+            mkdir -p "$WEB_DIR"
+            FLAGS_FILE="$WEB_DIR/feature_flags.json"
+            if [[ "$ACTION" == "enable_debug" ]]; then
+              jq '. + {"debug": true}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"debug": true}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              git commit -m "Enable debug feature [skip ci]" || true
+              git push origin main || true
+              notify_slack "[INFO] Debug feature ENABLED"
+              echo "[SUCCESS] Debug enabled"
+              exit 0
+            else
+              jq '. + {"debug": false}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"debug": false}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              git commit -m "Disable debug feature [skip ci]" || true
+              git push origin main || true
+              notify_slack "[INFO] Debug feature DISABLED"
+              echo "[SUCCESS] Debug disabled"
+              exit 0
+            fi
+          fi
+
+
 
           # ----------------------------
           # Maintenance OFF
