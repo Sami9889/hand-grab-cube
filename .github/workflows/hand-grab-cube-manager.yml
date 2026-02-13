@@ -56,6 +56,7 @@ jobs:
         shell: bash
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ACTION="${{ inputs.action }}"
           
@@ -77,6 +78,24 @@ jobs:
               curl -X POST -H 'Content-type: application/json' \
                 --data "{\"text\": \"$1\"}" "$SLACK_WEBHOOK" 2>/dev/null || true
             fi
+          }
+
+          # Helper: commit to a feature branch and open a PR instead of pushing to protected main
+          create_branch_and_pr() {
+            local BRANCH="$1"; shift
+            git checkout -b "$BRANCH"
+            git add -A || true
+            git commit -m "Website: $BRANCH [skip ci]" || true
+            git push --set-upstream origin "$BRANCH" || { echo "[ERROR] Failed to push $BRANCH"; return 1; }
+
+            # create PR via REST API
+            local PR_TITLE="$2"; shift
+            local PR_BODY="Automated update produced by hand-grab-cube manager workflow: $BRANCH"
+            curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
+              -d "{\"title\": \"${PR_TITLE}\", \"head\": \"${BRANCH}\", \"base\": \"main\", \"body\": \"${PR_BODY}\" }" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" >/dev/null || true
+            echo "[INFO] Created PR for $BRANCH"
+            return 0
           }
 
           # ----------------------------
@@ -129,17 +148,14 @@ jobs:
             if git diff --cached --quiet; then
               echo "[INFO] No changes to commit"
             else
-              git commit -m "Enable maintenance mode [skip ci]"
-              git pull --rebase origin main || true
-              git push origin main || {
-                echo "[ERROR] Failed to push changes"
-                exit 1
-              }
+              # create branch and open PR instead of pushing to protected main
+              BRANCH_NAME="website/maintenance-$(date -u '+%Y%m%d-%H%M%S')"
+              create_branch_and_pr "$BRANCH_NAME" "Website: maintenance update" || { echo "[ERROR] Branch/PR creation failed"; exit 1; }
             fi
             
-            notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube"
+            notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube (PR created)"
             echo "::endgroup::"
-            echo "[SUCCESS] Maintenance mode enabled successfully"
+            echo "[SUCCESS] Maintenance mode enabled successfully (PR created)"
             exit 0
           fi
 
@@ -154,18 +170,26 @@ jobs:
               jq '. + {"outline": true}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"outline": true}' > "$FLAGS_FILE.tmp"
               mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
               git add "$FLAGS_FILE" || true
-              git commit -m "Enable UI/hand outline feature [skip ci]" || true
-              git push origin main || true
-              notify_slack "[INFO] Outline feature ENABLED"
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
+                create_branch_and_pr "$BRANCH_NAME" "Website: enable outline feature" || echo "[WARN] Failed to create PR for outline flag"
+              fi
+              notify_slack "[INFO] Outline feature ENABLED (PR created if required)"
               echo "[SUCCESS] Outline enabled"
               exit 0
             else
               jq '. + {"outline": false}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"outline": false}' > "$FLAGS_FILE.tmp"
               mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
               git add "$FLAGS_FILE" || true
-              git commit -m "Disable UI/hand outline feature [skip ci]" || true
-              git push origin main || true
-              notify_slack "[INFO] Outline feature DISABLED"
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
+                create_branch_and_pr "$BRANCH_NAME" "Website: disable outline feature" || echo "[WARN] Failed to create PR for outline flag"
+              fi
+              notify_slack "[INFO] Outline feature DISABLED (PR created if required)"
               echo "[SUCCESS] Outline disabled"
               exit 0
             fi
@@ -182,18 +206,26 @@ jobs:
               jq '. + {"debug": true}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"debug": true}' > "$FLAGS_FILE.tmp"
               mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
               git add "$FLAGS_FILE" || true
-              git commit -m "Enable debug feature [skip ci]" || true
-              git push origin main || true
-              notify_slack "[INFO] Debug feature ENABLED"
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
+                create_branch_and_pr "$BRANCH_NAME" "Website: enable debug feature" || echo "[WARN] Failed to create PR for debug flag"
+              fi
+              notify_slack "[INFO] Debug feature ENABLED (PR created if required)"
               echo "[SUCCESS] Debug enabled"
               exit 0
             else
               jq '. + {"debug": false}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"debug": false}' > "$FLAGS_FILE.tmp"
               mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
               git add "$FLAGS_FILE" || true
-              git commit -m "Disable debug feature [skip ci]" || true
-              git push origin main || true
-              notify_slack "[INFO] Debug feature DISABLED"
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/featureflags-$(date -u '+%Y%m%d-%H%M%S')"
+                create_branch_and_pr "$BRANCH_NAME" "Website: disable debug feature" || echo "[WARN] Failed to create PR for debug flag"
+              fi
+              notify_slack "[INFO] Debug feature DISABLED (PR created if required)"
               echo "[SUCCESS] Debug disabled"
               exit 0
             fi
