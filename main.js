@@ -111,7 +111,23 @@ window.addEventListener('unhandledrejection', (event) => {
   }
   
   await refreshCameras();
-  await requestCameraPermission();
+  
+  // Show camera permission modal
+  const modal = document.getElementById('permissionModal');
+  const allowBtn = document.getElementById('allowCameraBtn');
+  const denyBtn = document.getElementById('denyCameraBtn');
+  
+  modal.style.display = 'flex';
+  
+  allowBtn.addEventListener('click', async () => {
+    modal.style.display = 'none';
+    await requestCameraPermission();
+  });
+  
+  denyBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+    if (statusEl) statusEl.textContent = 'Status: Camera access denied. Please refresh to try again.';
+  });
   
   // Start camera button
   if (cameraStartBtn && cameraSelect) {
@@ -353,12 +369,12 @@ window.addEventListener('unhandledrejection', (event) => {
     if (jumpButton) {
       jumpButton.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        cameraState.keys.space = true;
+        jumpRequested = true;
       });
       
       jumpButton.addEventListener('touchend', (e) => {
         e.preventDefault();
-        cameraState.keys.space = false;
+        // no need
       });
     }
     
@@ -368,6 +384,8 @@ window.addEventListener('unhandledrejection', (event) => {
   // Render loop
   let frameCount = 0;
   let lastLogTime = 0;
+  let jumpRequested = false;
+  let jumpVelocity = 0;
   
   startLoop(renderer, scene, camera, (dt) => {
     frameCount++;
@@ -413,7 +431,7 @@ window.addEventListener('unhandledrejection', (event) => {
         if (trackedPos) {
           avatar.group.position.lerp(
             new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
-            0.15 // Smooth movement
+            0.4 // Smooth movement
           );
           console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
         }
@@ -464,11 +482,23 @@ window.addEventListener('unhandledrejection', (event) => {
         if (trackedPos) {
           avatar.group.position.lerp(
             new THREE.Vector3(trackedPos.x, trackedPos.y, trackedPos.z),
-            0.15 // Smooth movement
+            0.4 // Smooth movement
           );
           console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
         }
       }
+    }
+    
+    // Handle jump
+    if (jumpRequested && jumpVelocity === 0 && avatar.group.position.y <= 1.7) {
+      jumpVelocity = 3;
+      jumpRequested = false;
+    }
+    avatar.group.position.y += jumpVelocity * dt;
+    jumpVelocity += -9.81 * dt;
+    if (avatar.group.position.y < 1.6) {
+      avatar.group.position.y = 1.6;
+      jumpVelocity = 0;
     }
   }, { updateCamera });
 

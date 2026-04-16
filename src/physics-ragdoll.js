@@ -32,6 +32,8 @@ export function createRagdoll(avatar, world) {
   for (const [a,b] of jointPairs) {
     if (bodies[a] && bodies[b]) joints.push(new Joint(bodies[a], bodies[b], 'ball'));
   }
+  // Add joints to world
+  joints.forEach(joint => world.addJoint(joint));
   return { bodies, joints };
 }
 

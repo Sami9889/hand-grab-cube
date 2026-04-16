@@ -117,6 +117,18 @@
     <div id="eventLog" aria-live="polite" aria-atomic="true"></div>
   </div>
 
+  <!-- Camera Permission Modal -->
+  <div id="permissionModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Camera Permission Required</h2>
+      <p>This application uses your camera for real-time body tracking to create an interactive 3D avatar experience. Your camera feed is processed locally in your browser and is not stored or transmitted.</p>
+      <div class="modal-buttons">
+        <button id="allowCameraBtn">Allow Camera Access</button>
+        <button id="denyCameraBtn">Deny</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden video element for camera feed -->
   <video id="video" autoplay playsinline style="display:none"></video>
   
@@ -138,3 +150,12 @@
   <script type="module" src="main.js"></script>
 </body>
 </html>
+
+<!-- Footer -->
+<footer style="position: absolute; bottom: 10px; left: 16px; font-size: 12px; color: #ccc;">
+  <a href="terms.html" style="color: #ccc; text-decoration: none;">Terms</a> | 
+  <a href="privacy.html" style="color: #ccc; text-decoration: none;">Privacy</a> | 
+  <a href="license.html" style="color: #ccc; text-decoration: none;">License</a> | 
+  <a href="security.html" style="color: #ccc; text-decoration: none;">Security</a> | 
+  <a href="contact.html" style="color: #ccc; text-decoration: none;">Contact</a>
+</footer>
