@@ -219,12 +219,45 @@ export async function createTracking({ onEvent, perfMode = false } = {}) {
   }
 
   function stopCamera(handle){ try{ if (!handle){ // stop all
-      poseCams.forEach(c=>{ try{ c.stop(); if (c.pose && typeof c.pose.close === 'function') c.pose.close(); }catch(e){} }); poseCams.length=0; }
+      poseCams.forEach(c=>{ try{ c.stop(); if (c.pose && typeof c.pose.close === 'function') c.pose.close(); }catch(e){} }); poseCams.length=0;
+      // Also stop test video if running
+      if (useTestVideo.currentRaf) {
+        cancelAnimationFrame(useTestVideo.currentRaf);
+        useTestVideo.currentRaf = null;
+      }
+    }
     else { try{ handle.stop(); const idx = poseCams.indexOf(handle); if (idx>=0) poseCams.splice(idx,1); if (handle.pose && typeof handle.pose.close === 'function') handle.pose.close(); }catch(e){} } }catch(e){} }
 
   function useTestVideo(videoEl, url) {
     stopCamera();
-    videoEl.src = url; videoEl.loop = true; return videoEl.play();
+    videoEl.src = url; videoEl.loop = true; 
+    const promise = videoEl.play();
+    
+    // Start frame processing loop for test video
+    const sendTestFrame = async () => {
+      if (!videoEl || videoEl.readyState < 2) { 
+        useTestVideo.currentRaf = requestAnimationFrame(sendTestFrame); 
+        return; 
+      }
+      if (!processFrame) { 
+        useTestVideo.currentRaf = requestAnimationFrame(sendTestFrame); 
+        return; 
+      }
+      processFrame = false;
+      try {
+        if (active === 'hands') await hands.send({ image: videoEl });
+        else if (active === 'pose') await pose.send({ image: videoEl });
+        else if (active === 'face') await faceMesh.send({ image: videoEl });
+      } catch(e) { 
+        console.error('[TRACKING] Test video frame processing error:', e); 
+      }
+      setTimeout(() => { processFrame = true; }, frameInterval);
+      useTestVideo.currentRaf = requestAnimationFrame(sendTestFrame);
+    };
+    
+    useTestVideo.currentRaf = requestAnimationFrame(sendTestFrame);
+    
+    return promise;
   }
 
   function setActive(mode) { active = mode; emit('mode', { mode }); }

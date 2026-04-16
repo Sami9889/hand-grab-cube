@@ -6,6 +6,7 @@ import { createTracking } from './src/tracking.js';
 import { createAvatar, updateAvatarFromPose } from './src/avatar.js';
 import { createHUD } from './src/hud.js';
 import { fuseAverages } from './src/multiview.js';
+import { animateWave } from './src/avatar-animator.js';
 
 // Enhanced error reporting
 window.addEventListener('error', (event) => {
@@ -215,6 +216,51 @@ window.addEventListener('unhandledrejection', (event) => {
     });
   }
   
+  // Test video control
+  const useTestVideoInput = document.getElementById('useTestVideo');
+  let testVideoActive = false;
+  let testVideoTimer = null;
+  const TEST_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+  
+  if (useTestVideoInput) {
+    useTestVideoInput.addEventListener('change', async (e) => {
+      testVideoActive = e.target.checked;
+      if (testVideoActive) {
+        // Stop any active cameras
+        activeCamHandles.forEach(h => {
+          try {
+            tracking.stopCamera(h);
+            if (h?.videoEl?.parentNode) h.videoEl.parentNode.removeChild(h.videoEl);
+          } catch (e) {
+            console.warn('Error stopping camera:', e);
+          }
+        });
+        activeCamHandles.length = 0;
+        
+        // Start test video
+        try {
+          await tracking.useTestVideo(videoEl, TEST_VIDEO_URL);
+          if (statusEl) {
+            statusEl.classList.remove('loading');
+            statusEl.textContent = 'Status: Test video active';
+          }
+        } catch (e) {
+          console.error('Failed to start test video:', e);
+          if (statusEl) statusEl.textContent = 'Status: Test video failed';
+        }
+      } else {
+        // Stop test video and restart cameras
+        tracking.stopCamera();
+        videoEl.pause();
+        videoEl.src = '';
+        if (statusEl) {
+          statusEl.classList.add('loading');
+          statusEl.textContent = 'Status: Tracking stopped';
+        }
+      }
+    });
+  }
+  
   // Performance mode - enable by default on mobile
   const lowPerfInput = document.getElementById('lowPerf');
   if (lowPerfInput) {
@@ -400,15 +446,29 @@ window.addEventListener('unhandledrejection', (event) => {
     console.log('[Mobile] Virtual controls initialized');
   }
 
+  // Keyboard controls
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      jumpRequested = true;
+    }
+  });
+
   // Render loop
   let frameCount = 0;
   let lastLogTime = 0;
   let jumpRequested = false;
   let jumpVelocity = 0;
+  let waveTime = 0;
   
   startLoop(renderer, scene, camera, (dt) => {
     frameCount++;
     const now = performance.now();
+    
+    // Update wave animation time
+    if (testVideoActive) {
+      waveTime += dt;
+    }
     
     if (latestPose) {
       // Use world landmarks if available (3D tracking)
@@ -445,6 +505,19 @@ window.addEventListener('unhandledrejection', (event) => {
           // Flip Y and Z to correct orientation
           return new THREE.Vector3(x, -y, -z);
         });
+        
+        // Detect jump from pose: if both wrists are above both shoulders
+        const leftShoulder = latestPose.world[11];
+        const rightShoulder = latestPose.world[12];
+        const leftWrist = latestPose.world[15];
+        const rightWrist = latestPose.world[16];
+        if (leftShoulder && rightShoulder && leftWrist && rightWrist) {
+          const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+          const avgWristY = (leftWrist.y + rightWrist.y) / 2;
+          if (avgWristY < avgShoulderY - 0.1) { // Wrists above shoulders (Y is down in MediaPipe)
+            jumpRequested = true;
+          }
+        }
         
         // Update avatar group position for walking/jumping movements
         if (trackedPos) {
@@ -506,6 +579,11 @@ window.addEventListener('unhandledrejection', (event) => {
           console.log(`[AVATAR] Position updated: (${avatar.group.position.x.toFixed(2)}, ${avatar.group.position.y.toFixed(2)}, ${avatar.group.position.z.toFixed(2)})`);
         }
       }
+    }
+    
+    // Apply wave animation when test video is active
+    if (testVideoActive) {
+      animateWave(avatar, 'right', waveTime);
     }
     
     // Handle jump
