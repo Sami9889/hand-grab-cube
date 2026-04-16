@@ -36,6 +36,22 @@ window.addEventListener('unhandledrejection', (event) => {
   
   document.body.appendChild(renderer.domElement);
   
+  // Snapshot button
+  const snapshotBtn = document.getElementById('snapshotBtn');
+  if (snapshotBtn) {
+    snapshotBtn.addEventListener('click', () => {
+      try {
+        const data = renderer.domElement.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = data;
+        a.download = `hand-grab-snap-${Date.now()}.png`;
+        a.click();
+      } catch (e) {
+        console.warn('snapshot failed', e);
+      }
+    });
+  }
+
   const statusEl = document.getElementById('status');
   if (statusEl) {
     statusEl.textContent = 'Status: Renderer initialized';
@@ -109,8 +125,6 @@ window.addEventListener('unhandledrejection', (event) => {
       if (statusEl) statusEl.textContent = 'Status: Camera permission denied';
     }
   }
-  
-  await refreshCameras();
   
   // Show camera permission modal
   const modal = document.getElementById('permissionModal');

@@ -120,8 +120,16 @@
   <!-- Camera Permission Modal -->
   <div id="permissionModal" class="modal" style="display: none;">
     <div class="modal-content">
-      <h2>Camera Permission Required</h2>
-      <p>This application uses your camera for real-time body tracking to create an interactive 3D avatar experience. Your camera feed is processed locally in your browser and is not stored or transmitted.</p>
+      <h2>Camera Access Required</h2>
+      <p>This body tracking application needs camera access to detect your pose in real-time and create an interactive 3D avatar that follows your movements.</p>
+      <p><strong>Why we need it:</strong></p>
+      <ul>
+        <li>Real-time pose estimation using MediaPipe</li>
+        <li>Local processing in your browser only</li>
+        <li>No data storage or transmission</li>
+        <li>Enhanced interactive experience</li>
+      </ul>
+      <p>Your privacy is protected - all processing happens locally.</p>
       <div class="modal-buttons">
         <button id="allowCameraBtn">Allow Camera Access</button>
         <button id="denyCameraBtn">Deny</button>
