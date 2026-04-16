@@ -131,7 +131,12 @@ window.addEventListener('unhandledrejection', (event) => {
   const allowBtn = document.getElementById('allowCameraBtn');
   const denyBtn = document.getElementById('denyCameraBtn');
   
-  modal.style.display = 'flex';
+  if (modal) {
+    modal.style.display = 'flex';
+    console.log('Camera permission modal shown');
+  } else {
+    console.error('Permission modal not found');
+  }
   
   allowBtn.addEventListener('click', async () => {
     modal.style.display = 'none';
