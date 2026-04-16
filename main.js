@@ -171,6 +171,8 @@ window.addEventListener('unhandledrejection', (event) => {
           const handle = await tracking.startCamera(v, { deviceId });
           activeCamHandles.push(handle);
           started++;
+          cameraStarted = true;
+          waveTime = 0;
           console.log('[MAIN] Camera started successfully');
         } catch (e) {
           console.error('[MAIN] Camera start failed:', e);
@@ -220,6 +222,7 @@ window.addEventListener('unhandledrejection', (event) => {
   const useTestVideoInput = document.getElementById('useTestVideo');
   let testVideoActive = false;
   let testVideoTimer = null;
+  let cameraStarted = false;
   const TEST_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
   
   if (useTestVideoInput) {
@@ -240,9 +243,11 @@ window.addEventListener('unhandledrejection', (event) => {
         // Start test video
         try {
           await tracking.useTestVideo(videoEl, TEST_VIDEO_URL);
+          cameraStarted = true;
+          waveTime = 0;
           if (statusEl) {
             statusEl.classList.remove('loading');
-            statusEl.textContent = 'Status: Test video active';
+            statusEl.textContent = 'Status: Test video active - Avatar waving!';
           }
         } catch (e) {
           console.error('Failed to start test video:', e);
@@ -253,6 +258,7 @@ window.addEventListener('unhandledrejection', (event) => {
         tracking.stopCamera();
         videoEl.pause();
         videoEl.src = '';
+        cameraStarted = false;
         if (statusEl) {
           statusEl.classList.add('loading');
           statusEl.textContent = 'Status: Tracking stopped';
@@ -581,9 +587,10 @@ window.addEventListener('unhandledrejection', (event) => {
       }
     }
     
-    // Apply wave animation when test video is active
-    if (testVideoActive) {
+    // Apply wave animation when test video or camera is active
+    if (testVideoActive || cameraStarted) {
       animateWave(avatar, 'right', waveTime);
+      console.log('[ANIMATION] Waving - time:', waveTime.toFixed(2));
     }
     
     // Handle jump

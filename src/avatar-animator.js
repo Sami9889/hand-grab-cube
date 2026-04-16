@@ -26,14 +26,44 @@ export function animateKick(avatar, side = 'left', t = 0) {
 }
 
 export function animateWave(avatar, side = 'right', t = 0) {
-  // Simple wave: move wrist and hand up and down
+  // Wave animation: move wrist and hand up and down with arm rotation
+  const shoulder = avatar.joints[side + 'Shoulder'];
+  const elbow = avatar.joints[side + 'Elbow'];
   const wrist = avatar.joints[side + 'Wrist'];
   const index = avatar.joints[side + 'Index'];
+  const pinky = avatar.joints[side + 'Pinky'];
   const thumb = avatar.joints[side + 'Thumb'];
-  if (wrist && index && thumb) {
-    const waveHeight = Math.sin(t * Math.PI * 4) * 0.15; // Faster wave motion
-    wrist.mesh.position.y += waveHeight;
-    index.mesh.position.y += waveHeight * 1.2;
-    thumb.mesh.position.y += waveHeight * 1.1;
+  
+  if (!wrist) return;
+  
+  // Wave height and rotation - more dramatic
+  const waveHeight = Math.sin(t * Math.PI * 4) * 0.25; // More dramatic vertical motion
+  const waveRotation = Math.sin(t * Math.PI * 4) * 0.4; // Add rotational motion
+  
+  // Move shoulder back for wave gesture
+  if (shoulder) {
+    shoulder.mesh.position.z -= Math.sin(t * Math.PI * 4) * 0.08;
+  }
+  
+  // Bend elbow
+  if (elbow) {
+    elbow.mesh.position.y += waveHeight * 0.8;
+    elbow.mesh.position.x += Math.sin(t * Math.PI * 4) * 0.1;
+  }
+  
+  // Move wrist up and down
+  wrist.mesh.position.y += waveHeight;
+  wrist.mesh.position.x += waveRotation * 0.15;
+  wrist.mesh.position.z += Math.sin(t * Math.PI * 4) * 0.08;
+  
+  // Move fingers
+  if (index) {
+    index.mesh.position.y += waveHeight * 1.3;
+  }
+  if (thumb) {
+    thumb.mesh.position.y += waveHeight * 1.2;
+  }
+  if (pinky) {
+    pinky.mesh.position.y += waveHeight * 1.25;
   }
 }
