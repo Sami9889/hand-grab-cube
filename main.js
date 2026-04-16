@@ -220,10 +220,21 @@ window.addEventListener('unhandledrejection', (event) => {
   
   // Test video control
   const useTestVideoInput = document.getElementById('useTestVideo');
+  const fullBodyLegsInput = document.getElementById('fullBodyLegs');
   let testVideoActive = false;
   let testVideoTimer = null;
   let cameraStarted = false;
+  let forceFullBodyLegs = false;
   const TEST_VIDEO_URL = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+  
+  if (fullBodyLegsInput) {
+    fullBodyLegsInput.addEventListener('change', (e) => {
+      forceFullBodyLegs = e.target.checked;
+      if (statusEl) {
+        statusEl.textContent = `Status: Full body legs ${forceFullBodyLegs ? 'enabled' : 'disabled'}`;
+      }
+    });
+  }
   
   if (useTestVideoInput) {
     useTestVideoInput.addEventListener('change', async (e) => {
