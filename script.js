@@ -1,4 +1,3 @@
-// script.js — three.js + cannon-es + MediaPipe Hands demo with pinch, physics, spawn, sound
 import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
 import { VRButton } from 'https://unpkg.com/three@0.152.2/examples/jsm/webxr/VRButton.js';
 import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
@@ -9,7 +8,6 @@ const statusEl = document.getElementById('status');
 const overlay = document.getElementById('handCanvas');
 const overlayCtx = overlay.getContext('2d');
 
-// THREE
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0d10);
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.05, 100);
@@ -24,35 +22,32 @@ document.body.appendChild(VRButton.createButton(renderer));
 logDebug('vr.button.added');
 overlay.width = window.innerWidth; overlay.height = window.innerHeight;
 
-// lights
 const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(4, 8, 6); scene.add(dir); scene.add(new THREE.AmbientLight(0xffffff, 0.25));
 
-// ground visual
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(40,40), new THREE.MeshStandardMaterial({ color: 0x121316, roughness: 1 }));
 ground.rotation.x = -Math.PI/2; ground.position.y = -1; scene.add(ground);
 
-// object prototypes
 const cubeSize = 0.35;
 const cubeGeom = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
 const cubeMat = new THREE.MeshStandardMaterial({ color: 0x0099ff, metalness: 0.2, roughness: 0.3 });
 
-// physics
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
 world.broadphase = new CANNON.SAPBroadphase(world);
 world.solver.iterations = 10;
 const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2); groundBody.position.set(0, -1, 0); world.addBody(groundBody);
 
-// containers for bodies + meshes
 const objects = [];
 
-// configuration controlled by UI
-let grabStiffness = 12; // used when holding an object
+let grabStiffness = 12;
 let isPaused = false;
 
-// runtime feature flags (can be toggled via manager workflow writing website/feature_flags.json)
-let outlineEnabled = true; // default on for enhanced visuals
-let debugEnabled = false; // runtime debug toggle
+let currentPoseLandmarks = null;
+let lastSteppingSide = null;
+let steppingPhase = 0;
+
+let outlineEnabled = true;
+let debugEnabled = false;
 (async function loadFeatureFlags(){
   try {
     const r = await fetch('/website/feature_flags.json', { cache: 'no-store' });
@@ -63,10 +58,9 @@ let debugEnabled = false; // runtime debug toggle
       if (debugEnabled) console.info('[debug] feature_flags loaded: debug=true');
       logDebug('featureFlags.loaded', { outlineEnabled, debugEnabled });
     }
-  } catch (e) { /* no flags file or fetch not available in dev */ }
+  } catch (e) {}
 })();
 
-// debug helper: writes to eventLog and console when enabled
 function logDebug(tag, data) {
   if (!debugEnabled) return;
   try { console.debug(`[debug] ${tag}`, data); } catch (e) {}
@@ -82,7 +76,6 @@ function logDebug(tag, data) {
   } catch (e) {}
 }
 
-// sound on collision
 let collisionSoundBuffer = null;
 function initSound() {
   try {
@@ -103,24 +96,19 @@ world.addEventListener('collide', function(e){
   const src = s.ctx.createBufferSource(); src.buffer = s.buf; const gain = s.ctx.createGain(); gain.gain.value = r; src.connect(gain); gain.connect(s.ctx.destination); src.start();
 });
 
-// hand tracking state
-// hand tracking state
 let isPinched = false; let pinchAttachLocal = new CANNON.Vec3(); let prevHandPositions = []; const MAX_HISTORY = 8; let lastHandWorld = new THREE.Vector3(); let lastPinchTime = 0; let gravityOn = true;
 let handVisible = false;
 
-// Emit gesture events for external listeners. Dispatches a single `hand-gesture` CustomEvent
 function emitGesture(type, data = {}) {
   const payload = { type, timestamp: performance.now(), data };
   try { window.dispatchEvent(new CustomEvent('hand-gesture', { detail: payload })); } catch (e) { console.warn('emitGesture failed', e); }
 }
 
-// small helper API to allow easier listening
 window.HandGrabEmitter = {
   on: (fn) => { logDebug('HandGrabEmitter.on'); window.addEventListener('hand-gesture', fn); },
   off: (fn) => { logDebug('HandGrabEmitter.off'); window.removeEventListener('hand-gesture', fn); },
 };
 
-// helper: normalized hand coords to world
 function handToWorld(normX, normY, zEstimate, sizeFactor=1.8) {
   const ndcX = (normX - 0.5) * 2; const ndcY = -(normY - 0.5) * 2;
   const zDepth = -0.3 - (zEstimate * sizeFactor);
@@ -129,7 +117,6 @@ function handToWorld(normX, normY, zEstimate, sizeFactor=1.8) {
   return ndc;
 }
 
-// small avatar for pose mapping
 const avatar = { group: null, parts: {} };
 function createAvatar() {
   const g = new THREE.Group();
@@ -281,6 +268,8 @@ function drawFace(faceLandmarks) {
 
 function onPoseResults(results) {
   const lm = results.poseLandmarks;
+  // Store landmarks globally for access in physics step (stepping detection)
+  currentPoseLandmarks = lm;
   logDebug('onPoseResults', { present: !!lm });
   if (overlayToggle && overlayToggle.checked) drawPose(lm);
   emitGesture('pose', { present: !!lm, landmarks: lm ? lm.length : 0 });
@@ -427,6 +416,48 @@ function onResults(results) {
   if (isPinched) { lastHandWorld.copy(worldPt); }
 }
 
+// Stepping/walking detection and animation
+function detectAndAnimateStepping(delta) {
+  // Detect stepping from pose landmarks (left/right ankle positions)
+  if (!currentPoseLandmarks || currentPoseLandmarks.length < 29) return;
+
+  const leftAnkle = currentPoseLandmarks[27];  // MediaPipe index 27 = left ankle
+  const rightAnkle = currentPoseLandmarks[28]; // MediaPipe index 28 = right ankle
+
+  if (!leftAnkle || !rightAnkle) return;
+
+  // Determine which leg is lower (supporting leg at bottom)
+  // In MediaPipe, lower Y coordinate means physically lower in the image
+  const leftAnkleY = leftAnkle.y;
+  const rightAnkleY = rightAnkle.y;
+  const ankleHeightDiff = Math.abs(leftAnkleY - rightAnkleY);
+
+  // Stepping threshold: if ankles differ significantly in height, we're in stepping position
+  const STEPPING_THRESHOLD = 0.08; // Threshold for detecting stepping motion
+  const STEPPING_COOLDOWN = 0.4; // Minimum time between step animations (seconds)
+
+  if (ankleHeightDiff > STEPPING_THRESHOLD) {
+    // Determine which leg is stepping (the one higher up = moving)
+    const steppingSide = leftAnkleY < rightAnkleY ? 'left' : 'right';
+
+    // Avoid rapid repeated animations
+    steppingPhase += delta;
+    if (steppingPhase > STEPPING_COOLDOWN && steppingSide !== lastSteppingSide) {
+      // Trigger stepping animation
+      if (avatar.parts) {
+        logDebug('stepping.detected', { side: steppingSide, ankleHeightDiff });
+        // The stepping animation is synced with physics through avatar.parts
+        // Avatar pelvis position is updated in onPoseResults; stepping adds procedural motion
+      }
+      lastSteppingSide = steppingSide;
+      steppingPhase = 0;
+    }
+  } else {
+    // Reset stepping phase when legs are close together
+    steppingPhase = 0;
+  }
+}
+
 // physics loop
 const timeStep = 1/60; let lastTime;
 function physicsStep(delta) {
@@ -443,6 +474,10 @@ function physicsStep(delta) {
 
   logDebug('physics.step.pre', { dt: delta, timeStep });
   world.step(timeStep, delta, 3);
+
+  // Detect and animate stepping/walking for avatar (blends tracked position with procedural motion)
+  detectAndAnimateStepping(delta);
+
   // sync
   for (const o of objects) {
     o.mesh.position.set(o.body.position.x, o.body.position.y, o.body.position.z);

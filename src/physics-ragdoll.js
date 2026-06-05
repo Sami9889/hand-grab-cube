@@ -1,10 +1,7 @@
-// physics-ragdoll.js
-// Full ragdoll system: creates physics bodies and joints for avatar, supports mode switching
 import { RigidBody } from './physics-rigidbody.js';
 import { Joint } from './physics-joint.js';
 
 export function createRagdoll(avatar, world) {
-  // Create a rigid body for each major joint
   const jointNames = Object.keys(avatar.joints);
   const bodies = {};
   for (const name of jointNames) {
@@ -13,11 +10,13 @@ export function createRagdoll(avatar, world) {
       mass: name.includes('Hip') || name.includes('pelvis') ? 10 : 2,
       position: { x: j.mesh.position.x, y: j.mesh.position.y, z: j.mesh.position.z },
       shape: 'sphere',
-      size: [0.08,0.08,0.08]
+      size: [0.08,0.08,0.08],
+      linearDamping: 0.1,
+      angularDamping: 0.3
     });
     world.addBody(bodies[name]);
   }
-  // Connect bodies with joints (ball joints for now)
+
   const jointPairs = [
     ['leftShoulder','leftElbow'], ['leftElbow','leftWrist'],
     ['rightShoulder','rightElbow'], ['rightElbow','rightWrist'],
@@ -32,7 +31,6 @@ export function createRagdoll(avatar, world) {
   for (const [a,b] of jointPairs) {
     if (bodies[a] && bodies[b]) joints.push(new Joint(bodies[a], bodies[b], 'ball'));
   }
-  // Add joints to world
   joints.forEach(joint => world.addJoint(joint));
   return { bodies, joints };
 }

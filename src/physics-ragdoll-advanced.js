@@ -1,10 +1,7 @@
-// physics-ragdoll-advanced.js
-// Advanced ragdoll: adds joint limits, torque, blending, and mode switching
 import { RigidBody } from './physics-rigidbody.js';
 import { Joint } from './physics-joint.js';
 
 export function createAdvancedRagdoll(avatar, world) {
-  // Create rigid bodies for all joints
   const jointNames = Object.keys(avatar.joints);
   const bodies = {};
   for (const name of jointNames) {
@@ -13,11 +10,28 @@ export function createAdvancedRagdoll(avatar, world) {
       mass: name.includes('Hip') || name.includes('pelvis') ? 10 : 2,
       position: { x: j.mesh.position.x, y: j.mesh.position.y, z: j.mesh.position.z },
       shape: 'sphere',
-      size: [0.08,0.08,0.08]
+      size: [0.08,0.08,0.08],
+      linearDamping: 0.1,
+      angularDamping: 0.3
     });
     world.addBody(bodies[name]);
   }
-  // Connect with joints and add limits
+
+  const jointLimits = {
+    'leftElbow': Math.PI * (160/180),
+    'rightElbow': Math.PI * (160/180),
+    'leftKnee': Math.PI * (160/180),
+    'rightKnee': Math.PI * (160/180),
+    'leftAnkle': Math.PI * (90/180),
+    'rightAnkle': Math.PI * (90/180),
+    'leftShoulder': Math.PI * (180/180),
+    'rightShoulder': Math.PI * (180/180),
+    'leftHip': Math.PI * (180/180),
+    'rightHip': Math.PI * (180/180),
+    'torso': Math.PI * (120/180),
+    'pelvis': Math.PI * (120/180)
+  };
+
   const jointPairs = [
     ['leftShoulder','leftElbow','hinge'], ['leftElbow','leftWrist','hinge'],
     ['rightShoulder','rightElbow','hinge'], ['rightElbow','rightWrist','hinge'],
@@ -30,15 +44,16 @@ export function createAdvancedRagdoll(avatar, world) {
   ];
   const joints = [];
   for (const [a,b,type] of jointPairs) {
-    if (bodies[a] && bodies[b]) joints.push(new Joint(bodies[a], bodies[b], type||'ball'));
+    if (bodies[a] && bodies[b]) {
+      const maxAngle = jointLimits[b] || null;
+      joints.push(new Joint(bodies[a], bodies[b], type||'ball', maxAngle));
+    }
   }
-  // Add joints to world
   joints.forEach(joint => world.addJoint(joint));
   return { bodies, joints };
 }
 
 export function blendToTracking(avatar, ragdoll, alpha = 0.2) {
-  // Blend ragdoll body positions toward tracked joint positions
   for (const name in ragdoll.bodies) {
     if (avatar.joints[name]) {
       const tracked = avatar.joints[name].mesh.position;
