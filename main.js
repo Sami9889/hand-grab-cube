@@ -131,23 +131,31 @@ window.addEventListener('unhandledrejection', (event) => {
   const modal = document.getElementById('permissionModal');
   const allowBtn = document.getElementById('allowCameraBtn');
   const denyBtn = document.getElementById('denyCameraBtn');
-  
+
   if (modal) {
     modal.style.display = 'flex';
     console.log('Camera permission modal shown');
   } else {
     console.error('Permission modal not found');
   }
-  
-  allowBtn.addEventListener('click', async () => {
-    modal.style.display = 'none';
-    await requestCameraPermission();
-  });
-  
-  denyBtn.addEventListener('click', () => {
-    modal.style.display = 'none';
-    if (statusEl) statusEl.textContent = 'Status: Camera access denied. Please refresh to try again.';
-  });
+
+  if (allowBtn) {
+    allowBtn.addEventListener('click', async () => {
+      if (modal) modal.style.display = 'none';
+      await requestCameraPermission();
+    });
+  } else {
+    console.error('Allow camera button not found');
+  }
+
+  if (denyBtn) {
+    denyBtn.addEventListener('click', () => {
+      if (modal) modal.style.display = 'none';
+      if (statusEl) statusEl.textContent = 'Status: Camera access denied. Please refresh to try again.';
+    });
+  } else {
+    console.error('Deny camera button not found');
+  }
   
   // Start camera button
   if (cameraStartBtn && cameraSelect) {
