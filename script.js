@@ -42,10 +42,6 @@ const objects = [];
 let grabStiffness = 12;
 let isPaused = false;
 
-let currentPoseLandmarks = null;
-let lastSteppingSide = null;
-let steppingPhase = 0;
-
 let outlineEnabled = true;
 let debugEnabled = false;
 (async function loadFeatureFlags(){
@@ -268,8 +264,6 @@ function drawFace(faceLandmarks) {
 
 function onPoseResults(results) {
   const lm = results.poseLandmarks;
-  // Store landmarks globally for access in physics step (stepping detection)
-  currentPoseLandmarks = lm;
   logDebug('onPoseResults', { present: !!lm });
   if (overlayToggle && overlayToggle.checked) drawPose(lm);
   emitGesture('pose', { present: !!lm, landmarks: lm ? lm.length : 0 });
@@ -417,47 +411,6 @@ function onResults(results) {
 }
 
 // Stepping/walking detection and animation
-function detectAndAnimateStepping(delta) {
-  // Detect stepping from pose landmarks (left/right ankle positions)
-  if (!currentPoseLandmarks || currentPoseLandmarks.length < 29) return;
-
-  const leftAnkle = currentPoseLandmarks[27];  // MediaPipe index 27 = left ankle
-  const rightAnkle = currentPoseLandmarks[28]; // MediaPipe index 28 = right ankle
-
-  if (!leftAnkle || !rightAnkle) return;
-
-  // Determine which leg is lower (supporting leg at bottom)
-  // In MediaPipe, lower Y coordinate means physically lower in the image
-  const leftAnkleY = leftAnkle.y;
-  const rightAnkleY = rightAnkle.y;
-  const ankleHeightDiff = Math.abs(leftAnkleY - rightAnkleY);
-
-  // Stepping threshold: if ankles differ significantly in height, we're in stepping position
-  const STEPPING_THRESHOLD = 0.08; // Threshold for detecting stepping motion
-  const STEPPING_COOLDOWN = 0.4; // Minimum time between step animations (seconds)
-
-  if (ankleHeightDiff > STEPPING_THRESHOLD) {
-    // Determine which leg is stepping (the one higher up = moving)
-    const steppingSide = leftAnkleY < rightAnkleY ? 'left' : 'right';
-
-    // Avoid rapid repeated animations
-    steppingPhase += delta;
-    if (steppingPhase > STEPPING_COOLDOWN && steppingSide !== lastSteppingSide) {
-      // Trigger stepping animation
-      if (avatar.parts) {
-        logDebug('stepping.detected', { side: steppingSide, ankleHeightDiff });
-        // The stepping animation is synced with physics through avatar.parts
-        // Avatar pelvis position is updated in onPoseResults; stepping adds procedural motion
-      }
-      lastSteppingSide = steppingSide;
-      steppingPhase = 0;
-    }
-  } else {
-    // Reset stepping phase when legs are close together
-    steppingPhase = 0;
-  }
-}
-
 // physics loop
 const timeStep = 1/60; let lastTime;
 function physicsStep(delta) {
@@ -474,9 +427,6 @@ function physicsStep(delta) {
 
   logDebug('physics.step.pre', { dt: delta, timeStep });
   world.step(timeStep, delta, 3);
-
-  // Detect and animate stepping/walking for avatar (blends tracked position with procedural motion)
-  detectAndAnimateStepping(delta);
 
   // sync
   for (const o of objects) {
