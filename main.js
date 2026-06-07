@@ -521,22 +521,26 @@ window.addEventListener('unhandledrejection', (event) => {
           console.log('[3D TRACKING] Sample landmark (hip):', latestPose.world[23]);
           lastLogTime = now;
         }
-        
-        const supportFoot = getSupportFootPosition(latestPose.world);
-        if (supportFoot) {
-          trackedPos = { 
-            x: supportFoot.x, 
-            y: -supportFoot.y + 1.6, 
-            z: -supportFoot.z 
+
+        const leftHip = latestPose.world[23];
+        const rightHip = latestPose.world[24];
+        if (leftHip && rightHip) {
+          const pelvisX = (leftHip.x + rightHip.x) / 2;
+          const pelvisY = (leftHip.y + rightHip.y) / 2;
+          const pelvisZ = (leftHip.z + rightHip.z) / 2;
+          trackedPos = {
+            x: pelvisX,
+            y: -pelvisY + 1.6,
+            z: -pelvisZ
           };
-          smoothingFactor = 0.85;
+          smoothingFactor = 0.15;
         } else {
           const pelvis = latestPose.world[23] || latestPose.world[24] || latestPose.world[0];
           if (pelvis) {
-            trackedPos = { 
-              x: pelvis.x, 
-              y: -pelvis.y + 1.6, 
-              z: -pelvis.z 
+            trackedPos = {
+              x: pelvis.x,
+              y: -pelvis.y + 1.6,
+              z: -pelvis.z
             };
           }
         }
@@ -577,16 +581,20 @@ window.addEventListener('unhandledrejection', (event) => {
           console.log('[2D TRACKING] Using screen landmarks:', latestPose.landmarks.length);
           lastLogTime = now;
         }
-        
-        const supportFoot = getSupportFootPosition(latestPose.landmarks);
-        if (supportFoot) {
-          const ndcX = (supportFoot.x - 0.5) * 2;
-          const ndcY = -(supportFoot.y - 0.5) * 2;
-          const ndcZ = -0.3 - (supportFoot.z * 1.6);
+
+        const leftHip = latestPose.landmarks[23];
+        const rightHip = latestPose.landmarks[24];
+        if (leftHip && rightHip) {
+          const pelvisX = (leftHip.x + rightHip.x) / 2;
+          const pelvisY = (leftHip.y + rightHip.y) / 2;
+          const pelvisZ = (leftHip.z + rightHip.z) / 2;
+          const ndcX = (pelvisX - 0.5) * 2;
+          const ndcY = -(pelvisY - 0.5) * 2;
+          const ndcZ = -0.3 - (pelvisZ * 1.6);
           const v = new THREE.Vector3(ndcX, ndcY, ndcZ);
           v.unproject(camera);
           trackedPos = { x: v.x, y: v.y, z: v.z };
-          smoothingFactor = 0.85;
+          smoothingFactor = 0.15;
         } else {
           const pelvis = latestPose.landmarks[23] || latestPose.landmarks[24] || latestPose.landmarks[0];
           if (pelvis) {
