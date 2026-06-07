@@ -119,11 +119,28 @@ window.addEventListener('unhandledrejection', (event) => {
   
   async function requestCameraPermission() {
     try {
-      await navigator.mediaDevices.getUserMedia({ video: true });
+      const constraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      stream.getTracks().forEach(track => track.stop());
+      console.log('Camera permission granted');
+      if (statusEl) statusEl.textContent = 'Status: Camera permission granted - select camera to start';
       await refreshCameras();
     } catch (e) {
-      console.warn('Camera permission request failed:', e);
-      if (statusEl) statusEl.textContent = 'Status: Camera permission denied';
+      console.error('Camera permission error:', e.name, e.message);
+      if (e.name === 'NotAllowedError') {
+        if (statusEl) statusEl.textContent = 'Status: Camera access was denied - please check permissions in settings';
+      } else if (e.name === 'NotFoundError') {
+        if (statusEl) statusEl.textContent = 'Status: No camera device found';
+      } else if (e.name === 'SecurityError') {
+        if (statusEl) statusEl.textContent = 'Status: Camera access requires HTTPS';
+      } else {
+        if (statusEl) statusEl.textContent = `Status: Camera error - ${e.message}`;
+      }
     }
   }
   
