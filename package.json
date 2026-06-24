@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "preview": "vite preview --port 5173",
-    "start": "vite"
+    "start": "vite",
+    "install": "bash ./install.sh",
+    "api:install": "node scripts/install-api.js",
+    "api:start": "node scripts/start-api.js",
+    "test:api": "node --test tests/api-system.test.cjs"
   },
   "devDependencies": {
     "vite": "^5.1.0"
