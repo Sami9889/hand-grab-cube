@@ -83,13 +83,17 @@ function findClientByApiKey(secrets, apiKey) {
 }
 
 async function resolveApiKeyFromUrl(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) {
-    throw new Error(`Unable to fetch API key from ${url}: ${response.status}`);
-  }
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+      return null;
+    }
 
-  const payload = await response.json();
-  return payload.apiKey || payload.key || payload.token || null;
+    const payload = await response.json();
+    return payload.apiKey || payload.key || payload.token || null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function createApiHandler({ packageJson = {}, config = {}, secrets = {} } = {}) {
