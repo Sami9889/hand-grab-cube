@@ -1,1 +1,3 @@
-export function createWSSender(url){ let ws=null; return { connect: ()=>{ ws=new WebSocket(url); ws.onopen=()=>console.log('ws open'); }, send: (d)=>{ if(ws && ws.readyState===1) ws.send(JSON.stringify(d)); } } }
+ETCGRABOÃ!ÜÍÐÿ½>×”‹Œfø‚ÑŽK<ýÚ?î½f	ª:Çp>møîÑ†RAç¬‘­á<8ŸmŸô¾"Ì”þck.m©¡nsoa\@q
+;«´Îò `·iç«
+îîH%¸G˜ÁïaêdÛyötPcá.~D	<ùJ´½íûQl®ìU‹2elO§Ï.y/¤0„ìÿ”µNäÊ&£Û¶®xŽ¹ml»(œäö˜M/¢´j5ä×õêÖ5ö[æ¿î²vàÒ

@@ -1,9 +1,1 @@
-// physics-contacts.js
-// Contact points for collision response
-export class Contact {
-  constructor(bodyA, bodyB, point = { x: 0, y: 0, z: 0 }) {
-    this.bodyA = bodyA;
-    this.bodyB = bodyB;
-    this.point = { ...point };
-  }
-}
+ETCGRABÜöQž‚‚{@ù¬SÔÍ€‹¡ŒÝÁ¤ÞÝ8ŸxXÊ­¾õÝé®Å´>)ºz¯×·åE–!IzÐ)-2˜åþ½-n‡IouˆhÑêbkÊÈœ*zÀo4]"Ò„Jý¯ty2bv¹ÖŒ«QÈI+Ï“Ô>³¹TgktQLKv&!àÇP>´DK~¹ž4Z%«`]*m­v¢>OáL:zy–Ä’¸jÉVgIeÊ&en’…™<J-Î}¹ÕJXxî>Ó2é©OµÑFFÁsÄb)!4^2B,)ƒß²³'O`¶Ìüöìf_Rù5Éçï=Í

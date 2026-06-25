@@ -1,1 +1,1 @@
-export function computeConfidence(landmarks){ return landmarks? 1.0 : 0.0; }
+ETCGRABOÃ!ÜÍÐÿ½>×”‹Îæ¼Æ0HíÍ¼{ÞRH­zum©GðÙë®øÌU™•ö%A“On‘-hõÝàþëŠŸiw¾Þ¦HÛ#½0ìh
