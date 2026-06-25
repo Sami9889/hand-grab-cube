@@ -11,7 +11,218 @@ on:
         default: ''
 
 jobs:
-  total-encryption:
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Write Crypt Script
+        run: |
+          cat > /tmp/crypt.js << 'SCRIPTEOF'
+          const fs = require("fs");
+          const path = require("path");
+
+          const CONFIG_VECTOR = {
+            seedString: process.env.GITHUB_REPOSITORY || "etcgrab-cube-tracking-system-api-distribution",
+            blockStride: 64,
+            sampleThreshold: 0.35,
+            magicHeader: [0x45, 0x54, 0x43, 0x47, 0x52, 0x41, 0x42]
+          };
+
+          const IS_DISPATCH = process.env.IS_DISPATCH === "true";
+          const DECRYPT_FILE = process.env.DECRYPT_FILE || "";
+          const SKIP_EXT = [".md", ".txt", ".yml", ".yaml"];
+          const root = process.env.GITHUB_WORKSPACE || process.cwd();
+
+          class KeyDerivationEngine {
+            constructor(seed) {
+              this.seed = seed;
+              this.xorKeyMatrix = new Uint8Array(256);
+              this.offsetMatrix = new Uint8Array(256);
+              this.permutationTable = new Uint8Array(256);
+              this.initializeMatrices();
+            }
+            initializeMatrices() {
+              let ax = 0xAA, ay = 0x55;
+              for (let i = 0; i < this.seed.length; i++) {
+                ax = (ax + this.seed.charCodeAt(i)) & 0xFF;
+                ay = (ay ^ this.seed.charCodeAt(i)) & 0xFF;
+              }
+              ax = (ax + 55) & 0xFF;
+              ay = (ay ^ 23) & 0xFF;
+              for (let j = 0; j < 256; j++) {
+                let sx = (ax + j) & 0xFF, sy = (ay ^ j) & 0xFF;
+                sx = (sx ^ (sy >> 2)) & 0xFF;
+                sy = (sy + (sx << 1)) & 0xFF;
+                this.xorKeyMatrix[j] = sx === 0 ? 0x1F : sx;
+                this.offsetMatrix[j] = sy === 0 ? 0xE7 : sy;
+                this.permutationTable[j] = j;
+              }
+              let si = 0;
+              for (let k = 0; k < 256; k++) {
+                si = (si + this.permutationTable[k] + this.xorKeyMatrix[k]) & 0xFF;
+                let t = this.permutationTable[k];
+                this.permutationTable[k] = this.permutationTable[si];
+                this.permutationTable[si] = t;
+              }
+            }
+            derivePositionMatrix(index) {
+              const m = index & 0xFF;
+              return {
+                xor: this.xorKeyMatrix[m] ^ this.permutationTable[m],
+                offset: (this.offsetMatrix[m] + this.permutationTable[m]) & 0xFF
+              };
+            }
+          }
+
+          class StateDetectionMatrix {
+            static checkIsEncrypted(buf) {
+              if (!buf || buf.length === 0) return false;
+              if (buf.length >= CONFIG_VECTOR.magicHeader.length) {
+                let match = true;
+                for (let h = 0; h < CONFIG_VECTOR.magicHeader.length; h++) {
+                  if (buf[h] !== CONFIG_VECTOR.magicHeader[h]) { match = false; break; }
+                }
+                if (match) return true;
+              }
+              let readable = 0;
+              for (let i = 0; i < buf.length; i++) {
+                const b = buf[i];
+                if ((b >= 32 && b <= 126) || b === 10 || b === 13 || b === 9) readable++;
+              }
+              return (readable / buf.length) < CONFIG_VECTOR.sampleThreshold;
+            }
+          }
+
+          class ByteTransformationPipeline {
+            constructor(kden) { this.kden = kden; }
+            executeForwardPass(buffer) {
+              const hl = CONFIG_VECTOR.magicHeader.length;
+              const out = Buffer.alloc(buffer.length + hl);
+              for (let h = 0; h < hl; h++) out[h] = CONFIG_VECTOR.magicHeader[h];
+              for (let i = 0; i < buffer.length; i++) {
+                let b = buffer[i];
+                const k = this.kden.derivePositionMatrix(i);
+                b = b ^ (k.xor ^ (i % CONFIG_VECTOR.blockStride));
+                b = ((b&0x01)<<7)|((b&0x02)<<5)|((b&0x04)<<3)|((b&0x08)<<1)|
+                    ((b&0x10)>>1)|((b&0x20)>>3)|((b&0x40)>>5)|((b&0x80)>>7);
+                b = (~b) & 0xFF;
+                b = (b + k.offset) & 0xFF;
+                b = ((b << 3) | (b >> 5)) & 0xFF;
+                out[i + hl] = b;
+              }
+              return out;
+            }
+            executeReversePass(buffer) {
+              const hl = CONFIG_VECTOR.magicHeader.length;
+              if (buffer.length < hl) return buffer;
+              const out = Buffer.alloc(buffer.length - hl);
+              for (let i = 0; i < out.length; i++) {
+                let b = buffer[i + hl];
+                const k = this.kden.derivePositionMatrix(i);
+                b = ((b >> 3) | (b << 5)) & 0xFF;
+                b = (b - k.offset) & 0xFF;
+                b = (~b) & 0xFF;
+                b = ((b&0x01)<<7)|((b&0x02)<<5)|((b&0x04)<<3)|((b&0x08)<<1)|
+                    ((b&0x10)>>1)|((b&0x20)>>3)|((b&0x40)>>5)|((b&0x80)>>7);
+                b = b ^ (k.xor ^ (i % CONFIG_VECTOR.blockStride));
+                out[i] = b;
+              }
+              return out;
+            }
+          }
+
+          const kde = new KeyDerivationEngine(CONFIG_VECTOR.seedString);
+          const pipeline = new ByteTransformationPipeline(kde);
+          const stats = { encrypted: 0, decrypted: 0, bypassed: 0 };
+
+          function shouldSkip(name) {
+            return SKIP_EXT.includes(path.extname(name).toLowerCase());
+          }
+
+          function processFile(filePath, forceDecrypt) {
+            const raw = fs.readFileSync(filePath);
+            const isEncrypted = StateDetectionMatrix.checkIsEncrypted(raw);
+            if (forceDecrypt) {
+              if (isEncrypted) {
+                fs.writeFileSync(filePath, pipeline.executeReversePass(raw));
+                stats.decrypted++;
+                console.log("Decrypted:", filePath);
+              } else { stats.bypassed++; }
+            } else {
+              if (!isEncrypted) {
+                fs.writeFileSync(filePath, pipeline.executeForwardPass(raw));
+                stats.encrypted++;
+                console.log("Encrypted:", filePath);
+              } else { stats.bypassed++; }
+            }
+          }
+
+          function walk(dir, forceDecrypt) {
+            for (const node of fs.readdirSync(dir)) {
+              const full = path.join(dir, node);
+              if (node === ".git" || node === "node_modules") { stats.bypassed++; continue; }
+              const stat = fs.statSync(full);
+              if (stat.isDirectory()) {
+                walk(full, forceDecrypt);
+              } else if (stat.isFile()) {
+                if (forceDecrypt || !shouldSkip(node)) {
+                  processFile(full, forceDecrypt);
+                } else {
+                  stats.bypassed++;
+                }
+              }
+            }
+          }
+
+          if (!IS_DISPATCH) {
+            walk(root, false);
+          } else if (DECRYPT_FILE !== "") {
+            const target = path.join(root, DECRYPT_FILE);
+            if (!fs.existsSync(target)) { console.error("File not found:", DECRYPT_FILE); process.exit(1); }
+            processFile(target, true);
+          } else {
+            walk(root, true);
+          }
+
+          console.log("Stats:", stats);
+          SCRIPTEOF
+
+      - name: Decrypt Files for CodeQL
+        env:
+          IS_DISPATCH: "true"
+          DECRYPT_FILE: ""
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: node /tmp/crypt.js
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  encrypt-and-deploy:
+    name: Encrypt & Deploy Pages
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -199,6 +410,34 @@ jobs:
           console.log("Stats:", stats);
           SCRIPTEOF
 
+      # On push: normalize to plaintext first (handles files already encrypted from last run)
+      - name: Decrypt All Files
+        if: github.event_name == 'push'
+        env:
+          IS_DISPATCH: "true"
+          DECRYPT_FILE: ""
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: node /tmp/crypt.js
+
+      # Push the plaintext copy to gh-pages so GitHub Pages can serve it
+      - name: Deploy Plaintext to GitHub Pages Branch
+        if: github.event_name == 'push'
+        env:
+          PAT: ${{ secrets.PAT }}
+        run: |
+          mkdir /tmp/pages-deploy
+          rsync -a --exclude='.git' --exclude='node_modules' "$GITHUB_WORKSPACE/" /tmp/pages-deploy/
+          cd /tmp/pages-deploy
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${PAT}@github.com/${GITHUB_REPOSITORY}"
+          git add -A
+          git commit -m "deploy: sync plaintext to GitHub Pages [automated]"
+          git push origin HEAD:gh-pages --force
+
+      # Encrypt the working tree (push event = encrypt; dispatch = decrypt)
       - name: Run Crypt Script
         env:
           DECRYPT_FILE: ${{ github.event.inputs.file || '' }}
