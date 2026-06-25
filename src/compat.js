@@ -1,1 +1,1 @@
-export function supportsWebXR(){ try{ return !!(navigator.xr); }catch(e){return false;} }
+ETCGRABOÃ!ÜÍÐÿ½>×”Ë‰£¼ÚÅó(K»_ÿÇ;n'Û¬l0±Øìkü»G¡±fB–¡Ë«•ïZ²ÝòoªßmÚ€È)&Þ”)%hl˜œ¼Àé7H˜Ò1

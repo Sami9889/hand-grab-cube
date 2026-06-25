@@ -1,13 +1,2 @@
-// physics-character.js
-// Character controller for avatars
-export class PhysicsCharacter {
-  constructor(body) {
-    this.body = body;
-  }
-  jump(force = 5) {
-    this.body.applyForce(0, force * this.body.mass, 0);
-  }
-  move(dx, dz, speed = 1) {
-    this.body.applyForce(dx * speed, 0, dz * speed);
-  }
-}
+ETCGRABÜöQž‚‚{@ù¬SÓ›È€‹fºîð»Ý¹Í]S	¯y'˜/:Bö^ìjº¹’®•"1æA¤	nÓ*)0c}z©Ÿ·È(²Z¨c í|/nßEm3IáÅ²8\ÌÝE=Ã·a´¹"ˆéÖKýš[’{UÙ’¹„ñßµØ¸ña—"µP¹‹Âž*?}4½kÆk`ûß–c1ï]&Üê,8!1ÑŽ^Ég
+`O£°…vn¾>.z<%Ï{(‹“õé¨Oô“cƒ:Á"Uõ.¢tÈ¶V+­€‰ö³u¢‡2¾!|ë”ŒáJâÌh]¾tŸ3ö;Í×îŒËHÉ‰“e™ÂldÇ‡Ø‚â_K³Ä?»{0ÔÙŒM$íwð*oK¾nÍ>›~£Þ:³Ø)/Ïa™CT¢¤±
