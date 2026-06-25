@@ -1,1 +1,5 @@
-ETCGRABÏ!ÜÍĞ½6:ùVWØ‰%ÏJaÛ2Z(8¼¼\Ò¾œpÜ/.BõYª-ÎºÕ˜‡3¡G—æzë¯uv»}mŸCI.¦š¬Vêa¬_ok>£+qObY„ÈÚ?i¶¹‚åà0h Û@ú¬ÙĞHBœÀ¬çêæSzÆ£g§ë‹Bjî4Kê“ºÓÚ?XfY¤¶,İ§O½,hRøÉ¿±™Ğ»§FÛÂ·)<~	¹û†	­iš0û-Kğçp92à×áŞgv	ö×îoÆÉã ƒ'œ7FÎ:ƒªf¬¸SI`ş®õaaíÌV~ü9O‰ÏŠ^‚ä˜UheÀ\E'Z‰ÀÃ96ùøÔ“¯ÌEÌLp‰hC€»(
+import { createTracking } from './tracking.js';
+export async function createMultiTracker(options={}){
+  // convenience wrapper to manage multiple tracking instances
+  return { start: ()=>console.log('multi tracker start stub'), stop: ()=>console.log('multi tracker stop stub') };
+}

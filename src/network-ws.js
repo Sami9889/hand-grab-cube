@@ -1,3 +1,1 @@
-ETCGRABOÃ!ÜÍĞÿ½>×”‹Œfø‚ÑK<ıÚ?î½f	ª:Çp>møîÑ†RAç¬‘­á<8ŸmŸô¾"Ì”şck.m©¡nsoa\@q
-;«´Îò `·iç«
-îîH%¸G˜ÁïaêdÛyötPcá.~D	<ùJ´½íûQl®ìU‹2elO§Ï.y/¤0„ìÿ”µNäÊ&£Û¶®x¹ml»(œäö˜M/¢´j5ä×õêÖ5ö[æ¿î²vàÒ
+export function createWSSender(url){ let ws=null; return { connect: ()=>{ ws=new WebSocket(url); ws.onopen=()=>console.log('ws open'); }, send: (d)=>{ if(ws && ws.readyState===1) ws.send(JSON.stringify(d)); } } }
