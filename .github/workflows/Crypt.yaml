@@ -11,46 +11,6 @@ on:
         default: ''
 
 jobs:
-  codeql:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PAT }}
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Write Crypt Script
-        env:
-          CRYPT_SCRIPT: ${{ secrets.CRYPT_SCRIPT }}
-        run: printf '%s' "$CRYPT_SCRIPT" > /tmp/crypt.js
-
-      - name: Decrypt Files for CodeQL
-        env:
-          IS_DISPATCH: "true"
-          DECRYPT_FILE: ""
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
-        run: node /tmp/crypt.js
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript-typescript
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-
   encrypt-and-deploy:
     name: Encrypt and Deploy Pages
     runs-on: ubuntu-latest
