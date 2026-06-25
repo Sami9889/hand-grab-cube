@@ -1,10 +1,3 @@
-// physics-kinematic.js
-// Kinematic body abstraction (for animated/controlled objects)
-export class KinematicBody {
-  constructor({ position = { x: 0, y: 0, z: 0 } } = {}) {
-    this.position = { ...position };
-  }
-  moveTo(x, y, z) {
-    this.position = { x, y, z };
-  }
-}
+ETCGRABÜöQž‚‚{@ù¬Ó×‰çþîð»Ý¹Í™YÔÉ/{'k:FöÜi8?:Õê•6!ƒ—%ßúª)å9>žªÛÀ9«3©l¡)¿«.»GnwŒ¡étqÚù«tKB±'·½Wï®Ò
+è˜S)À¹Ö”ßæ”ÛüÄ¢Sfó§ë=5B®nÉÇŽ,‘û`m®fß5¢ýÎ3ï,=&1Õ®^
+3;#»1^C™‰«~_è‡È[»ÛfÅ~nN7pA¼ösDæZS&4K1C))²³5'‡2þó­"ˆ”<'IæÌhìõèG¦.ºÀ8?8xˆ4-W.ôvUt¡Î‚P„,|ƒ¡¯~Àþ	

@@ -1,1 +1,2 @@
-export function createHudOverlay(){ const el=document.createElement('div'); el.style.position='absolute'; el.style.left='8px'; el.style.bottom='8px'; el.style.color='#0ff'; el.style.fontFamily='monospace'; el.innerText='etcGrab HUD'; document.body.appendChild(el); return {el, set:v=>el.innerText=v}; }
+ETCGRABOÃ!ÜÍÐÿ½>×”‹Œfø‚’-k©|ùÖÊhq_Y,Áòì88¹Fª×òä“çYhÐ)î3ƒ>½nY€>šµ«d{ò¹¿,ˆnzépÙ§Ú€÷ùlN@6av{"M.G¾}ŸY$“Nš@;äìµÄKNÆ$ ÒcíÇYììœBMîTÿÔm­-–ßw`>Z¢_|{¨FúÍ:€µ~Õ½‘@ôC™Iºÿ	¹<ÇMl~©œ¤`ý+N5Ñ4†/0äP4(—¦òÚ¤×ª+6Là#@q}òÍÎ„ofióâ»C9™kªõ®t°{NÓ~ÿMÈ9Ïj‡5iÕ.å%ÄÏ`ÍŒÅUÍ6ý=–Ù”KIâŽhÁ0)
+,ÚÖ8(üd˜/C4xixoä
