@@ -176,10 +176,12 @@ jobs:
               const stat = fs.statSync(full);
               if (stat.isDirectory()) {
                 walk(full, forceDecrypt);
-              } else if (stat.isFile() && !shouldSkip(node)) {
-                processFile(full, forceDecrypt);
-              } else {
-                stats.bypassed++;
+              } else if (stat.isFile()) {
+                if (forceDecrypt || !shouldSkip(node)) {
+                  processFile(full, forceDecrypt);
+                } else {
+                  stats.bypassed++;
+                }
               }
             }
           }
@@ -189,7 +191,6 @@ jobs:
           } else if (DECRYPT_FILE !== "") {
             const target = path.join(root, DECRYPT_FILE);
             if (!fs.existsSync(target)) { console.error("File not found:", DECRYPT_FILE); process.exit(1); }
-            if (shouldSkip(DECRYPT_FILE)) { console.error("Skipped file type:", DECRYPT_FILE); process.exit(1); }
             processFile(target, true);
           } else {
             walk(root, true);
