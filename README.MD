@@ -74,4 +74,4 @@ Events include a small `data` payload with world coordinates and velocity (for `
 
 
 ## License
-MIT
+https://github.com/Sami9889/hand-grab-cube/blob/main/LICENSE.MD
