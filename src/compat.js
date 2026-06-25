@@ -1,1 +1,1 @@
-ETCGRABOÃ!ÜÍĞÿ½>×”Ë‰£¼ÚÅó(K»_ÿÇ;n'Û¬l0±Øìkü»G¡±fB–¡Ë«•ïZ²İòoªßmÚ€È)&Ş”)%hl˜œ¼Àé7H˜Ò1
+export function supportsWebXR(){ try{ return !!(navigator.xr); }catch(e){return false;} }

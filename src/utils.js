@@ -1,1 +1,2 @@
-ETCGRABOÃ!ÜÍĞÿ½>×”‹Ìgz÷õØh¿»k›G	®¾#Ûí:£w­¹¸<SW @ÄQ Yï–®[óªvû/î¬õXï.0®.k>BëeËâ‚L	|^tÎ eğº"L¯@	ÿ,&–{×²èÆñ*E
+export function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+export function lerp(a,b,t){ return a*(1-t)+b*t; }

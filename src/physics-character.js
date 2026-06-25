@@ -1,2 +1,13 @@
-ETCGRAB‹ˆQûÇÇ{@˘¨S”õ»Äãçf∫Óª›πÕ]S	Øy'ò/:Bˆ^Ïj∫πíÆï"1ÊA§	n”*)0çc}z©ü∑»(≤Z®c†Ì|/nﬂEm3I·≈≤8\Ã›E=√∑a¥π"àÈ÷K˝ö[í{UŸíπÑÒﬂµÿ∏Òaó"µPπã¬Åû*?}4Ωk∆k`˚ﬂñèc1Ô]&‹Í,8!1—é^…g
-`O£∞Övnæ>.z<%œ{(ãìıÈ®OÙìcÉ:¡"Uı.¢t»∂V+≠Äâˆ≥u¢á2æ!|Îîå·J‚Ãh]ætü3ˆ;Õ◊ÓåÀH…âìeô¬ld«áÿÇ‚_K≥ƒ?ª{0‘ŸåÅM$Ìw*oKænÕ>õ~£çﬁ:≥ÿ)/œaôCT¢§±
+// physics-character.js
+// Character controller for avatars
+export class PhysicsCharacter {
+  constructor(body) {
+    this.body = body;
+  }
+  jump(force = 5) {
+    this.body.applyForce(0, force * this.body.mass, 0);
+  }
+  move(dx, dz, speed = 1) {
+    this.body.applyForce(dx * speed, 0, dz * speed);
+  }
+}
