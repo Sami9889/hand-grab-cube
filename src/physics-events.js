@@ -1,1 +1,5 @@
-ETCGRABÜöQž‚‚{@ù¬VœEËÚå¾ðÁZOº|Gh¹'˜ë:Eö>h»üÕ.QÓ@Ñ—'OîÔ©nuÙ÷¬y\ïÝÂËotüV¯`+xk©~Fo4ÈaÞÒöÌ¼ùn´¾‚´§rle*“)ü¬ÝVË#Š5¯anô–ZÿòsÖvPû	´çÿMN]4¯ªþÙ»Ÿfb3­Y'Ê<,éƒúÍ:‚ódLà1Àr)ÿØ‹
+// physics-events.js
+// Event system for physics (collisions, triggers)
+export function onCollision(bodyA, bodyB, callback) {
+  // TODO: Register callback for collision events
+}

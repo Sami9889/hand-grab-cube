@@ -1,1 +1,1 @@
-ETCGRABOÃ!ÜÍĞÿ½>×”£~›å0)h¸ù1M®şâÜé©°µ[©©¾=OVÓ°Ğ‘¤Ik—*)pÙòª˜ìYI(±éÓë°ºx¯Ş¨{Án4ßäAô8Ü?ª3N°â0J
+export function applyRetargetSkeleton(skinnedMesh, landmarks){ console.log('retarget-full stub'); }

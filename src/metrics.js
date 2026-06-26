@@ -1,1 +1,1 @@
-ETCGRABOÃ!ÜÍĞÿ½>×”‹Îæ¼Æ0HíÍ¼{ŞRH­zum©GğÙë®øÌU™•ö%A“On‘-hõİàşëŠŸiw¾Ş¦HÛ#½0ìh
+export function computeConfidence(landmarks){ return landmarks? 1.0 : 0.0; }
