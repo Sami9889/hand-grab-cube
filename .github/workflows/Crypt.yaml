@@ -54,9 +54,9 @@ jobs:
           OBFUSCATE_SCRIPT: ${{ secrets.OBFUSCATE_SCRIPT }}
         run: node -e "const fs=require('fs'); fs.writeFileSync('/tmp/obfuscate.js', process.env.OBFUSCATE_SCRIPT);"
 
-      - name: Install Obfuscator
+      - name: Install Terser
         if: github.event_name == 'push'
-        run: cd /tmp && npm install javascript-obfuscator
+        run: cd /tmp && npm install terser
 
       - name: Obfuscate JS Files for Pages
         if: github.event_name == 'push'
