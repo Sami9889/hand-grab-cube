@@ -49,6 +49,7 @@ jobs:
         run: |
           mkdir /tmp/pages-deploy
           rsync -a --exclude='.git' --exclude='node_modules' "$GITHUB_WORKSPACE/" /tmp/pages-deploy/
+          echo "hand-grab-cube.sami-s.dev" > /tmp/pages-deploy/CNAME
           cd /tmp/pages-deploy
           git init
           git config user.name "github-actions[bot]"
