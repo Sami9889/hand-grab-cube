@@ -1,1 +1,9 @@
-ETCGRABÜöQ‚‚{@ù¬SÔÍ€‹¡ŒİÁ¤Şİ8ŸxXÊ­¾õİé®Å´>)ºz¯×·åE–!IzĞ)-2˜åş½-n‡IouˆhÑêbkÊÈœ*zÀo4]"Ò„Jı¯ty2bv¹ÖŒ«QÈI+Ï“Ô>³¹TgktQLKv&!àÇP>´DK~¹4Z%«`]*m­v¢>OáL:zy–Ä’¸jÉVgIeÊ&en’…™<J-Î}¹ÕJXxî>Ó2é©OµÑFFÁsÄb)!4^2B,)ƒß²³'O`¶Ìüöìf_Rù5Éçï=Í
+// physics-contacts.js
+// Contact points for collision response
+export class Contact {
+  constructor(bodyA, bodyB, point = { x: 0, y: 0, z: 0 }) {
+    this.bodyA = bodyA;
+    this.bodyB = bodyB;
+    this.point = { ...point };
+  }
+}

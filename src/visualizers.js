@@ -1,1 +1,1 @@
-ETCGRABOÃ!ÜÍÐÿ½>×”ˆŒg¿:0èo8|v?íyâl»0ôÙª/¸<Ñ(‘¥vR–„Kî‘©hõšvþy_iî59™ð.
+export function drawSkeleton3D(scene, landmarks){ /* minimal stub */ }

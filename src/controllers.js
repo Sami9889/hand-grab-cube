@@ -1,2 +1,1 @@
-ETCGRABOÃ!ÜÍÐÿ½>×”J£Úó,íÏ>ù6LÏ¼áÜmï°w*o?z‚™Q’±!A—'OoÐÍn0÷¬;žèßó¹(±Ÿ©d{â¹¼*˜n9DnáËa[R‡Êž>¶¹…v§t{bL
-Ö).˜•—þ‡[€«…qßw–ßò6!å§
+export function mapControllerToAvatar(avatar, controllerPose, hand='left'){ console.log('mapControllerToAvatar stub', hand); }

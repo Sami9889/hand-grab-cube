@@ -1,1 +1,6 @@
-ETCGRABOÃ!ÜÍĞÿ½>×”‰¡ù|Ä0,hIº¸MLéşæ¹/ïD0¹î­H.T"ÀVF—æOköï)õ_ ¬ùÛ[BŒ(µ¼¬êäkI,*¸ƒè§.V„?ªs¹4·ft{Û@êRE®UÎ5î£nõ¶¼‚ WÂBDÿúÁ…˜­iY4Ë-•¹ª=˜•2¢¯ZãÜš~+…›Úµg;áL§1¬‡rê<½¹+|é©ü˜‰WEé/Ìõ…¢4şòµœC44¥—?«÷Ÿ³³B³˜eD‹øµ«ªIãÉÆ"ø]\$mğrx?î¼9IJy×6ÎV¶3ÀIóUú7Â|Ãú»Ğ–œ<”ËñJôrŸ\ŠøiŠ8hJõß®¼s³nkşK>…"sR†Uçnî7XÚ÷hvúÌ­2ÈñÍ¨–|"9ÿÜÛê)Â­e×Ş…ôÎLn*£K4v&´¾%ÖJ,í.Õ§
+export function fuseAverages(worldArrays){
+  if (!worldArrays || worldArrays.length===0) return null;
+  const L = worldArrays[0].length; const out = new Array(L);
+  for (let i=0;i<L;i++){ let sx=0,sy=0,sz=0,c=0; for(const w of worldArrays){ const p=w[i]; if(!p) continue; sx+=p.x; sy+=p.y; sz+=p.z; c++; } out[i]= c? {x:sx/c,y:sy/c,z:sz/c} : null; }
+  return out;
+}
