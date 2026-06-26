@@ -1,0 +1,463 @@
+
+name: "Hand Grab Cube Manager"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose action"
+        required: true
+        default: "status"
+        type: choice
+        options:
+          - maintenance_on
+          - maintenance_off
+          - report
+          - build
+          - status
+          - clean_builds
+          - enable_outline
+          - disable_outline
+          - enable_debug
+          - disable_debug
+  schedule:
+    - cron: '0 2 * * 1'
+
+jobs:
+  manager:
+    name: "Manager: ${{ inputs.action || 'scheduled' }}"
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Prepare Folders
+        run: |
+          mkdir -p website
+          mkdir -p website/live
+          mkdir -p website/live_backup
+          mkdir -p reports
+          mkdir -p build_artifacts
+
+      - name: Execute Menu Action
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_REVIEWER: "Sami9889"
+        run: |
+          ACTION="${{ inputs.action }}"
+          
+          if [ -z "$ACTION" ]; then
+            ACTION="status"
+          fi
+          
+          echo "Running action: $ACTION"
+          
+          WEB_DIR="website"
+          LIVE_DIR="$WEB_DIR/live"
+          BACKUP_DIR="$WEB_DIR/live_backup"
+          MAINT_FILE="$WEB_DIR/index.html"
+          STATUS_FILE="$WEB_DIR/status.json"
+          REPORT_DIR="reports"
+
+          notify_slack() {
+            if [ -n "$SLACK_WEBHOOK" ]; then
+              curl -X POST -H 'Content-type: application/json' \
+                --data "{\"text\": \"$1\"}" "$SLACK_WEBHOOK" 2>/dev/null || true
+            fi
+          }
+
+          # Helper: commit to a feature branch and open a PR instead of pushing to protected main
+          # Create PR helper — push only to a pre-created persistent branch (website/automation)
+          create_branch_and_pr() {
+            local BRANCH="$1"; shift
+            local PR_TITLE="$1"; shift || true
+
+            # ensure branch exists on remote (repo may restrict branch creations)
+            if ! git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              echo "[ERROR] Remote branch '$BRANCH' does not exist or branch creation is restricted."
+              echo "Please create the branch 'website/automation' in the repository or relax branch creation rules for the workflow."
+              return 2
+            fi
+
+            # update local copy of the branch
+            git fetch origin "$BRANCH":"$BRANCH" || { echo "[ERROR] Failed to fetch remote branch $BRANCH"; return 1; }
+            git checkout "$BRANCH"
+            git add -A || true
+            git commit -m "Website: $BRANCH [skip ci]" || true
+            git push origin "$BRANCH" || { echo "[ERROR] Failed to push to $BRANCH"; return 1; }
+
+            # create PR and request a reviewer (use gh if available, otherwise REST API)
+            local PR_BODY="Automated update produced by hand-grab-cube manager workflow: $BRANCH"
+            if command -v gh >/dev/null 2>&1; then
+              gh pr create --title "${PR_TITLE}" --body "${PR_BODY}" --base main --head "${BRANCH}" --reviewer "$DEFAULT_REVIEWER" >/dev/null 2>&1 || true
+              echo "[INFO] PR created/updated (gh) and reviewer requested: $DEFAULT_REVIEWER"
+            else
+              # create PR via REST API and request reviewer
+              local PR_JSON
+              PR_JSON=$(curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
+                -d "{\"title\": \"${PR_TITLE}\", \"head\": \"${BRANCH}\", \"base\": \"main\", \"body\": \"${PR_BODY}\" }" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls") || true
+              local PR_NUMBER
+              if command -v jq >/dev/null 2>&1; then
+                PR_NUMBER=$(printf "%s" "$PR_JSON" | jq -r '.number')
+              else
+                PR_NUMBER=$(printf "%s" "$PR_JSON" | grep -m1 -o '"number":[0-9]*' | cut -d: -f2 | tr -d ' ')
+              fi
+              if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+                curl -s -X POST -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
+                  -d "{\"reviewers\": [\"${DEFAULT_REVIEWER}\"] }" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/requested_reviewers" >/dev/null 2>&1 || true
+                echo "[INFO] PR created via REST and reviewer requested: $DEFAULT_REVIEWER (PR #${PR_NUMBER})"
+              else
+                echo "[WARN] PR creation returned no PR number; reviewer not requested"
+              fi
+            fi
+            echo "[INFO] Updated branch and ensured PR exists for $BRANCH"
+            return 0
+          }
+
+          # ----------------------------
+          # Maintenance ON
+          # ----------------------------
+          if [[ "$ACTION" == "maintenance_on" ]]; then
+            echo "::group::Enabling maintenance mode"
+            echo "MAINTENANCE_MODE=ON" > maintenance.flag
+
+            if [ -d "$LIVE_DIR" ] && [ "$(ls -A $LIVE_DIR 2>/dev/null)" ]; then
+              rm -rf "$BACKUP_DIR"
+              cp -r "$LIVE_DIR/." "$BACKUP_DIR"
+              echo "[SUCCESS] Live site backed up"
+            fi
+
+            CURRENT_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')
+            
+            cat > "$MAINT_FILE" <<MAINTENANCEPAGE
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Maintenance - Hand Grab Cube</title>
+          <style>
+          body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:linear-gradient(135deg,#0b0d10 0%,#1a1c22 100%);color:#e6eef6;text-align:center;padding:20px;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0}
+          .container{max-width:600px;padding:40px;background:rgba(255,255,255,0.05);border-radius:16px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1)}
+          h1{font-size:2.5em;margin-bottom:0.5em;color:#00d1ff;font-weight:600}
+          p{font-size:1.2em;margin:1em 0;color:#cfd8dc;line-height:1.6}
+          .footer{margin-top:50px;font-size:0.9em;color:#9fb2c2;opacity:0.8}
+          .status-badge{display:inline-block;padding:8px 16px;background:rgba(255,179,71,0.2);border:1px solid #ffb347;border-radius:6px;font-size:0.9em;font-weight:600;margin-bottom:20px}
+          </style>
+          </head>
+          <body>
+          <div class="container">
+          <div class="status-badge">MAINTENANCE MODE</div>
+          <h1>Site Under Maintenance</h1>
+          <p>Hand Grab Cube is currently undergoing scheduled maintenance.</p>
+          <p>We will be back shortly. Thank you for your patience.</p>
+          <div class="footer">Last updated: ${CURRENT_DATE}</div>
+          </div>
+          </body>
+          </html>
+          MAINTENANCEPAGE
+
+            echo "{\"status\":\"maintenance\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" maintenance.flag 2>/dev/null || true
+            
+            if git diff --cached --quiet; then
+              echo "[INFO] No changes to commit"
+            else
+              # push to a persistent branch (must already exist): website/automation
+              BRANCH_NAME="website/automation"
+              create_branch_and_pr "$BRANCH_NAME" "Website: maintenance update" || { echo "[ERROR] Branch/PR creation failed — ensure 'website/automation' exists or update repo rules"; exit 1; }
+            fi
+            
+            notify_slack "[SUCCESS] Maintenance mode ENABLED for Hand Grab Cube (PR created)"
+            echo "::endgroup::"
+            echo "[SUCCESS] Maintenance mode enabled successfully (PR created)"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Enable/Disable UI Outline Feature
+          # ----------------------------
+          if [[ "$ACTION" == "enable_outline" || "$ACTION" == "disable_outline" ]]; then
+            echo "::group::Toggling outline feature - $ACTION"
+            mkdir -p "$WEB_DIR"
+            FLAGS_FILE="$WEB_DIR/feature_flags.json"
+            if [[ "$ACTION" == "enable_outline" ]]; then
+              jq '. + {"outline": true}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"outline": true}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: enable outline feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
+              fi
+              notify_slack "[INFO] Outline feature ENABLED (PR created if required)"
+              echo "[SUCCESS] Outline enabled"
+              exit 0
+            else
+              jq '. + {"outline": false}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"outline": false}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: disable outline feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
+              fi
+              notify_slack "[INFO] Outline feature DISABLED (PR created if required)"
+              echo "[SUCCESS] Outline disabled"
+              exit 0
+            fi
+          fi
+
+          # ----------------------------
+          # Enable/Disable Debug Feature
+          # ----------------------------
+          if [[ "$ACTION" == "enable_debug" || "$ACTION" == "disable_debug" ]]; then
+            echo "::group::Toggling debug feature - $ACTION"
+            mkdir -p "$WEB_DIR"
+            FLAGS_FILE="$WEB_DIR/feature_flags.json"
+            if [[ "$ACTION" == "enable_debug" ]]; then
+              jq '. + {"debug": true}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"debug": true}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: enable debug feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
+              fi
+              notify_slack "[INFO] Debug feature ENABLED (PR created if required)"
+              echo "[SUCCESS] Debug enabled"
+              exit 0
+            else
+              jq '. + {"debug": false}' "$FLAGS_FILE" 2>/dev/null > "$FLAGS_FILE.tmp" || echo '{"debug": false}' > "$FLAGS_FILE.tmp"
+              mv "$FLAGS_FILE.tmp" "$FLAGS_FILE"
+              git add "$FLAGS_FILE" || true
+              if git diff --cached --quiet; then
+                echo "[INFO] No feature-flag changes to commit"
+              else
+                BRANCH_NAME="website/automation"
+                create_branch_and_pr "$BRANCH_NAME" "Website: disable debug feature" || echo "[WARN] Failed to update feature flags on 'website/automation' branch"
+              fi
+              notify_slack "[INFO] Debug feature DISABLED (PR created if required)"
+              echo "[SUCCESS] Debug disabled"
+              exit 0
+            fi
+          fi
+
+
+
+          # ----------------------------
+          # Maintenance OFF
+          # ----------------------------
+          if [[ "$ACTION" == "maintenance_off" ]]; then
+            echo "::group::Disabling maintenance mode"
+            rm -f maintenance.flag
+
+            if [ -d "$BACKUP_DIR" ] && [ "$(ls -A $BACKUP_DIR 2>/dev/null)" ]; then
+              rm -rf "$WEB_DIR"/*
+              cp -r "$BACKUP_DIR/." "$WEB_DIR/"
+              echo "[SUCCESS] Live site restored from backup"
+            else
+              cat > "$WEB_DIR/index.html" <<LIVEPAGE
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Hand Grab Cube</title>
+          </head>
+          <body>
+          <h1>Hand Grab Cube Live</h1>
+          <p>Welcome back. The site is now live.</p>
+          </body>
+          </html>
+          LIVEPAGE
+              echo "[SUCCESS] Created default live page"
+            fi
+
+            echo "{\"status\":\"live\",\"last_updated\":\"$(date -u '+%Y-%m-%dT%H:%M:%SZ')\"}" > "$STATUS_FILE"
+
+            git add "$WEB_DIR" 2>/dev/null || true
+            git add maintenance.flag 2>/dev/null || true
+            
+            if git diff --cached --quiet; then
+              echo "[INFO] No changes to commit"
+            else
+              git commit -m "Disable maintenance mode [skip ci]"
+              git pull --rebase origin main || true
+              git push origin main || {
+                echo "[ERROR] Failed to push changes"
+                exit 1
+              }
+            fi
+            
+            notify_slack "[SUCCESS] Maintenance mode DISABLED - Live site restored"
+            echo "::endgroup::"
+            echo "[SUCCESS] Maintenance mode disabled successfully"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Generate Report
+          # ----------------------------
+          if [[ "$ACTION" == "report" ]]; then
+            echo "::group::Generating project report"
+            REPORT="$REPORT_DIR/report-$(date +%Y%m%d-%H%M%S).txt"
+            
+            echo "================================================" > "$REPORT"
+            echo "Hand Grab Cube Project Report" >> "$REPORT"
+            echo "Generated: $(date '+%Y-%m-%d %H:%M:%S UTC')" >> "$REPORT"
+            echo "================================================" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "[REPOSITORY INFORMATION]" >> "$REPORT"
+            echo "  Branch: $(git branch --show-current)" >> "$REPORT"
+            echo "  Commit: $(git log -1 --oneline)" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "[FILE STATISTICS]" >> "$REPORT"
+            echo "  Total files: $(find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' | wc -l)" >> "$REPORT"
+            echo "  JavaScript: $(find . -name '*.js' -not -path '*/node_modules/*' | wc -l)" >> "$REPORT"
+            echo "  HTML: $(find . -name '*.html' | wc -l)" >> "$REPORT"
+            echo "  CSS: $(find . -name '*.css' | wc -l)" >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "[LINES OF CODE]" >> "$REPORT"
+            
+            JS_LINES=$(find . -name '*.js' -not -path '*/node_modules/*' -type f -exec cat {} \; 2>/dev/null | wc -l)
+            [ "$JS_LINES" -gt 0 ] && echo "  JavaScript: $JS_LINES lines" >> "$REPORT"
+            
+            HTML_LINES=$(find . -name '*.html' -type f -exec cat {} \; 2>/dev/null | wc -l)
+            [ "$HTML_LINES" -gt 0 ] && echo "  HTML: $HTML_LINES lines" >> "$REPORT"
+            
+            CSS_LINES=$(find . -name '*.css' -type f -exec cat {} \; 2>/dev/null | wc -l)
+            [ "$CSS_LINES" -gt 0 ] && echo "  CSS: $CSS_LINES lines" >> "$REPORT"
+            
+            echo "" >> "$REPORT"
+            echo "[TOP 10 LARGEST FILES]" >> "$REPORT"
+            find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' -exec du -h {} + 2>/dev/null | sort -rh | head -10 >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "[RECENT COMMITS - LAST 10]" >> "$REPORT"
+            git log -10 --oneline --decorate >> "$REPORT"
+            echo "" >> "$REPORT"
+            echo "================================================" >> "$REPORT"
+            
+            cat "$REPORT"
+            
+            echo "::endgroup::"
+            echo "[SUCCESS] Report generated: $REPORT"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Build
+          # ----------------------------
+          if [[ "$ACTION" == "build" ]]; then
+            echo "::group::Building project"
+            
+            if [ -f package.json ]; then
+              echo "[INFO] Installing Node dependencies..."
+              npm ci 2>/dev/null || npm install || echo "[WARNING] npm install failed"
+              
+              if npm run 2>/dev/null | grep -q "build"; then
+                echo "[INFO] Running build script..."
+                npm run build || echo "[WARNING] Build script failed"
+              fi
+            fi
+            
+            if [ -f requirements.txt ]; then
+              echo "[INFO] Installing Python dependencies..."
+              pip install -r requirements.txt --break-system-packages 2>/dev/null || \
+              pip install -r requirements.txt 2>/dev/null || \
+              echo "[WARNING] Python install failed"
+            fi
+            
+            notify_slack "[SUCCESS] Build completed"
+            echo "::endgroup::"
+            echo "[SUCCESS] Build complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Clean Builds
+          # ----------------------------
+          if [[ "$ACTION" == "clean_builds" ]]; then
+            echo "::group::Cleaning build artifacts"
+            
+            rm -rf build_artifacts/* 2>/dev/null || true
+            rm -rf node_modules/.cache 2>/dev/null || true
+            rm -rf dist 2>/dev/null || true
+            rm -rf .next 2>/dev/null || true
+            rm -rf .nuxt 2>/dev/null || true
+            
+            notify_slack "[SUCCESS] Build artifacts cleaned"
+            echo "::endgroup::"
+            echo "[SUCCESS] Cleanup complete"
+            exit 0
+          fi
+
+          # ----------------------------
+          # Status
+          # ----------------------------
+          if [[ "$ACTION" == "status" ]]; then
+            echo "================================================"
+            echo "Hand Grab Cube - Project Status"
+            echo "================================================"
+            echo ""
+            
+            if [ -f maintenance.flag ]; then
+              echo "Status: MAINTENANCE MODE"
+              echo "   $(cat maintenance.flag)"
+            else
+              echo "Status: LIVE"
+            fi
+            
+            echo ""
+            echo "[GIT INFORMATION]"
+            echo "   Branch: $(git branch --show-current)"
+            echo "   Commit: $(git log -1 --oneline)"
+            echo "   Remote: $(git remote get-url origin 2>/dev/null || echo 'N/A')"
+            echo ""
+            
+            if [ -f "$STATUS_FILE" ]; then
+              echo "[STATUS FILE]"
+              cat "$STATUS_FILE" | sed 's/^/   /'
+            fi
+            
+            echo ""
+            echo "[DIRECTORY STRUCTURE]"
+            echo "   Website dir exists: $([ -d "$WEB_DIR" ] && echo 'Yes' || echo 'No')"
+            echo "   Backup dir exists: $([ -d "$BACKUP_DIR" ] && echo 'Yes' || echo 'No')"
+            echo ""
+            echo "================================================"
+            exit 0
+          fi
+
+          echo "[ERROR] Unknown action: $ACTION"
+          echo "Available actions: maintenance_on, maintenance_off, report, build, status, clean_builds"
+          exit 1
+
+      - name: Upload Report
+        if: inputs.action == 'report'
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 30

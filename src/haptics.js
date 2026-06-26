@@ -1,0 +1,1 @@
+export function pulseAll(renderer,intensity=0.5,duration=60){ try{ const s = renderer.xr.getSession && renderer.xr.getSession(); if(!s) return; for(const input of s.inputSources){ const gp = input.gamepad; if(gp && gp.hapticActuators && gp.hapticActuators.length) gp.hapticActuators[0].pulse(intensity,duration).catch(()=>{}); } }catch(e){} }

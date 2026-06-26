@@ -1,0 +1,1 @@
+export function createHudOverlay(){ const el=document.createElement('div'); el.style.position='absolute'; el.style.left='8px'; el.style.bottom='8px'; el.style.color='#0ff'; el.style.fontFamily='monospace'; el.innerText='etcGrab HUD'; document.body.appendChild(el); return {el, set:v=>el.innerText=v}; }

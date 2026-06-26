@@ -1,0 +1,1 @@
+export function createWSSender(url){ let ws=null; return { connect: ()=>{ ws=new WebSocket(url); ws.onopen=()=>console.log('ws open'); }, send: (d)=>{ if(ws && ws.readyState===1) ws.send(JSON.stringify(d)); } } }
