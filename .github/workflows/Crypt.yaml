@@ -42,17 +42,23 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
         run: node /tmp/crypt.js
 
-      - name: Deploy Plaintext to GitHub Pages
+      - name: Deploy Plaintext to GitHub Pages Branch
         if: github.event_name == 'push'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          personal_token: ${{ secrets.PAT }}
-          publish_dir: ./
-          exclude_assets: '.github'
-          force_orphan: true
-          commit_message: 'deploy: sync plaintext to GitHub Pages [skip ci]'
+        env:
+          PAT: ${{ secrets.PAT }}
+        run: |
+          mkdir /tmp/pages-deploy
+          rsync -a --exclude='.git' --exclude='node_modules' "$GITHUB_WORKSPACE/" /tmp/pages-deploy/
+          cd /tmp/pages-deploy
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${PAT}@github.com/${GITHUB_REPOSITORY}"
+          git add -A
+          git commit -m "deploy: sync plaintext to GitHub Pages [skip ci]"
+          git push origin HEAD:gh-pages --force
 
-      - name: Run Crypt Script
+      - name: Encrypt Files
         env:
           DECRYPT_FILE: ${{ github.event.inputs.file || '' }}
           IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
@@ -62,6 +68,7 @@ jobs:
 
       - name: Commit Transformed Repository Tree
         run: |
+          cd "$GITHUB_WORKSPACE"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${{ secrets.PAT }}@github.com/${{ github.repository }}
