@@ -42,21 +42,15 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
         run: node /tmp/crypt.js
 
-      - name: Deploy Plaintext to GitHub Pages Branch
+      - name: Deploy Plaintext to GitHub Pages
         if: github.event_name == 'push'
-        env:
-          PAT: ${{ secrets.PAT }}
-        run: |
-          mkdir /tmp/pages-deploy
-          rsync -a --exclude='.git' --exclude='node_modules' "$GITHUB_WORKSPACE/" /tmp/pages-deploy/
-          cd /tmp/pages-deploy
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add origin "https://x-access-token:${PAT}@github.com/${GITHUB_REPOSITORY}"
-          git add -A
-          git commit -m "deploy: sync plaintext to GitHub Pages [skip ci]"
-          git push origin HEAD:gh-pages --force
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.PAT }}
+          publish_dir: ./
+          exclude_assets: '.github'
+          force_orphan: true
+          commit_message: 'deploy: sync plaintext to GitHub Pages [skip ci]'
 
       - name: Run Crypt Script
         env:
