@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Back Soon</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0a;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    .bg {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, #1a1a2e 0%, #0a0a0a 70%);
+      z-index: 0;
+    }
+
+    .stars {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: #fff;
+      border-radius: 50%;
+      animation: twinkle var(--d) ease-in-out infinite var(--delay);
+      opacity: 0;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; }
+      50% { opacity: var(--op); }
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 3rem 4rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      backdrop-filter: blur(12px);
+      max-width: 480px;
+      width: 90%;
+      box-shadow: 0 0 80px rgba(120,80,255,0.12);
+    }
+
+    .emoji {
+      font-size: 3.5rem;
+      margin-bottom: 1.2rem;
+      display: block;
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p {
+      color: rgba(255,255,255,0.5);
+      font-size: 1rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .back-date {
+      display: inline-block;
+      padding: 0.5rem 1.2rem;
+      background: rgba(120,80,255,0.15);
+      border: 1px solid rgba(120,80,255,0.3);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      color: #c4aaff;
+      letter-spacing: 0.3px;
+    }
+
+    .dots {
+      margin-top: 2rem;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse {
+      0%, 100% { background: rgba(255,255,255,0.15); transform: scale(1); }
+      50% { background: rgba(120,80,255,0.8); transform: scale(1.3); }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="stars" id="stars"></div>
+
+  <div class="card">
+    <span class="emoji">🏖️</span>
+    <h1>On Holiday</h1>
+    <p>I'm away for a few weeks and the site is taking a break too. Everything will be back up and running soon.</p>
+    <span class="back-date">Back around 17 July 2026</span>
+    <div class="dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+
+  <script>
+    const stars = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.style.cssText = `
+        left:${Math.random()*100}%;
+        top:${Math.random()*100}%;
+        --d:${2 + Math.random()*4}s;
+        --delay:-${Math.random()*4}s;
+        --op:${0.3 + Math.random()*0.7};
+        width:${Math.random() > 0.8 ? 3 : 2}px;
+        height:${Math.random() > 0.8 ? 3 : 2}px;
+      `;
+      stars.appendChild(s);
+    }
+  </script>
+</body>
+</html>
