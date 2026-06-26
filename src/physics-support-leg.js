@@ -1,17 +1,2 @@
-// physics-support-leg.js
-// Detects which leg is supporting and syncs physics body accordingly
-export function getSupportLeg(landmarks) {
-  // Use MediaPipe Pose indices: 27 = leftAnkle, 28 = rightAnkle
-  if (!landmarks || landmarks.length < 29) return null;
-  const left = landmarks[27], right = landmarks[28];
-  if (!left || !right) return null;
-  // Lower y is closer to ground (y up)
-  return left.y < right.y ? 'left' : 'right';
-}
-
-export function getSupportFootPosition(landmarks) {
-  if (!landmarks || landmarks.length < 29) return null;
-  const left = landmarks[27], right = landmarks[28];
-  if (!left || !right) return null;
-  return left.y < right.y ? left : right;
-}
+ETCGRABÜöQ‚‚{@ù¬–ßÎÏö~]€Åë®HhÍvÉêzçÜ+:óY(¨K¹¨C•õREUàéĞìouv¸8›[œM«tˆªÒ«b.¼hª9Ã¬eIá\G²Oıè´ş–5âµ}%MSJîÔˆU@è6¤¯¶¿ frdïzBÛë¯›4ù%kæ/®¸”v)^§È^¿-‘13y¾óÈçOcFŞ2…ßúJ¹_zúE	ºı¨šàõéyùÆÂp±(°ã–j$ò=b×,¨²Xr%A·İrFÎıµ|æ(Kâ; ZºÙ:r.ñ39‰QîˆËßÌ€4n.ôÀ€Ê“ï7Â|ÃùøAÒœE™s~\4ìh?¸{ûõÛì-À´íx8¼<ªÕñçEğÖ˜DÚŸe¬+êÛÆ™ôØZg)¤ª:k‰œ{Ç*0‹enC±Î¨{EK³£T} ‰è@È}¡SÀZ@ë„ hæ“øÃà%~>”ê~ùÍAêWû`»^•#¢}OàH½», …ƒ©^È‚rH§¼Q÷-ô·.K¹-Z+®úM|êÛfÁ9¿Êñb´(0äÄsìTF32BíjåKäd¥³œqˆü÷û¦kÊb½Á!ëlºSŸä2=ºAê8¿I½7™‘ëôÂAÈ…äZÍÀ‚ˆÅ?ºT’~Ô™œ0‰hÅ0)¯<îXN+JSY,Áòì8¼=êCd@à“§KnĞ«-Ğí1š*Š©ZÂNh¦ÌZÑê§¨?®ß/#¤ïÒ„ËŸn]A»A7b;¥~ˆj%EIB[€ëñl±İHs!gö§)=DiêÎ²
+Ÿãk½Ü•#¢{O¢É¹{üg1UxM9Á"™#

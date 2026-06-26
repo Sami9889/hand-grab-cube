@@ -1,8 +1,1 @@
-// physics-bvh.js
-// Bounding Volume Hierarchy for broadphase collision
-export class BVHNode {
-  constructor(bodies = []) {
-    this.bodies = bodies;
-    // TODO: Build BVH tree
-  }
-}
+ETCGRABÜöQž‚‚{@ù¬WþËûðˆh¥±-éO9|ÜGï-þ#l: ÷Øë,ü>“nCµ$æMníkõÙc¬¼ê_Cˆ-3üV¯`+xk®;À/7]Å?bÒÈ™{Ý÷è4 !vy!Mè,!WŒFŸ@ï„5ßôÈŽE!P-ûAÂhnÇÊí%.`œ=\Ñ `ØO3Ü®¨}¤"ðí‹UdJb1úà™ûiLPM<¼

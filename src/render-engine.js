@@ -1,11 +1,3 @@
-// render-engine.js
-// Abstraction for switching or extending the rendering engine
-// This is a stub for integrating other renderers (e.g. Babylon.js, PlayCanvas, custom WebGL)
-
-export function createRenderEngine(type = 'three') {
-  if (type === 'three') {
-    return import('./renderer.js');
-  }
-  // TODO: Add support for other engines
-  throw new Error('Render engine not supported: ' + type);
-}
+ETCGRABÜöQ˜ŒÃÇù¯=ÐTË¡«êðCNjŠ~¼ÙQ(ødn­cî¬û>“.Ó@æA£ˆ«®ëvœa¬ynî…Ë.µ¬Öh#¹¿.)=ÇºåÝ×=B÷
+Šú¯E?4rb°ùW‹«üé–TIA[À+•ñhµY¼v¡§òc(~ÂýìœG9Ÿ7R^?ÙÖŽäð½OÂMºÿÀTøJq¦ŠäÆ-är¯+šúüúX¿lâÂ­ˆ2åƒ®sfÐ1ìu§pÈu…Ê)ÁLà ´v6EÎƒyfîÐÎáÎ—²›
+lha¬ä&ûÎ›ØH3®Õºp3ùtQNÃ>ýºA×ÎÏóîðôméOº¼Ú8*¹ð	šØ0c˜›8KÏ„™²rÆÑ„Îkë(2ÛáúyŠh]…¾*umþ%/½/˜¯wYeŒ`G·8{¨EX†v§³lP,.ÒhZÏ–ÐÁœ@¹g®æT¾ÆäSbög¸‹·~¨K„Êâ”

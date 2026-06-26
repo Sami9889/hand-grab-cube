@@ -1,10 +1,1 @@
-// physics-ground.js
-// Ground plane for physics world
-export function createGround({ size = [40, 40], y = -1 } = {}) {
-  return {
-    shape: 'box',
-    size: [size[0], 0.1, size[1]],
-    position: { x: 0, y, z: 0 },
-    mass: 0
-  };
-}
+ETCGRABÜöQž‚‚{@ù¬T‘ÉˆÚå¾ðÁZMŽ8¹XV¾ëþál:Eö>h»üÕ.QÓ@'†T'ÎÜm+qÝ'¬¿_èÜ€J*7ˆhé$h¿Éß.~Fjä×F2KŠ«Ý×Œt¡Ä«Áü“ü¸¬MeEÊUÎ5h×vß1 LŽÀfRf0å~¹S~ùÉÃÉï-`¯¸Ùõ>O3Ü|¿ª‘wƒÚ=ErmíÒ1ìqÁ<ÿêŒýZ”­zï¼ÓwéoOð§÷-4µÄ³ßÒòá×l²·³u'f×‹ƒ|¢kÔ‰ÉÓUNh˜ªSéG
