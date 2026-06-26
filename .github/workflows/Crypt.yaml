@@ -42,40 +42,20 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
         run: node /tmp/crypt.js
 
-      - name: Copy Decrypted Files for Pages
-        if: github.event_name == 'push'
-        run: |
-          mkdir /tmp/pages-deploy
-          rsync -a --exclude='.git' --exclude='node_modules' "$GITHUB_WORKSPACE/" /tmp/pages-deploy/
-
-      - name: Write Obfuscate Script
-        if: github.event_name == 'push'
-        env:
-          OBFUSCATE_SCRIPT: ${{ secrets.OBFUSCATE_SCRIPT }}
-        run: node -e "const fs=require('fs'); fs.writeFileSync('/tmp/obfuscate.js', process.env.OBFUSCATE_SCRIPT);"
-
-      - name: Install Terser
-        if: github.event_name == 'push'
-        run: cd /tmp && npm install terser
-
-      - name: Obfuscate JS Files for Pages
-        if: github.event_name == 'push'
-        env:
-          PAGES_DIR: /tmp/pages-deploy
-        run: node /tmp/obfuscate.js
-
-      - name: Deploy to GitHub Pages Branch
+      - name: Deploy Plaintext to GitHub Pages Branch
         if: github.event_name == 'push'
         env:
           PAT: ${{ secrets.PAT }}
         run: |
+          mkdir /tmp/pages-deploy
+          rsync -a --exclude='.git' --exclude='node_modules' "$GITHUB_WORKSPACE/" /tmp/pages-deploy/
           cd /tmp/pages-deploy
           git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote add origin "https://x-access-token:${PAT}@github.com/${GITHUB_REPOSITORY}"
           git add -A
-          git commit -m "deploy: sync obfuscated build to GitHub Pages [skip ci]"
+          git commit -m "deploy: sync plaintext to GitHub Pages [skip ci]"
           git push origin HEAD:gh-pages --force
 
       - name: Run Crypt Script
