@@ -78,6 +78,6 @@ jobs:
           if git diff-index --quiet HEAD --; then
             exit 0
           else
-            git commit -m "security: polymorphic file structure lockdown cycle completed [skip ci]"
+            git commit -m "crypt"
             git push origin main
           fi
